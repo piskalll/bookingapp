@@ -49,7 +49,7 @@ class VenueController extends Controller
         // Handle image upload
         if ($request->hasFile('image')) {
             $imageName = time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-            $request->file('image')->move(public_path('venues'), $imageName);
+            $request->file('image')->move(public_path('venue-images'), $imageName);
             $validated['image'] = $imageName;
         }
 
@@ -88,12 +88,12 @@ class VenueController extends Controller
         // Handle image upload
         if ($request->hasFile('image')) {
             // Delete old image
-            if ($venue->image && file_exists(public_path('venues/' . $venue->image))) {
-                unlink(public_path('venues/' . $venue->image));
+            if ($venue->image && file_exists(public_path('venue-images/' . $venue->image))) {
+                unlink(public_path('venue-images/' . $venue->image));
             }
 
             $imageName = time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-            $request->file('image')->move(public_path('venues'), $imageName);
+            $request->file('image')->move(public_path('venue-images'), $imageName);
             $validated['image'] = $imageName;
         }
 
@@ -109,8 +109,8 @@ class VenueController extends Controller
     public function destroy(Venue $venue)
     {
         // Delete image if exists
-        if ($venue->image && file_exists(public_path('venues/' . $venue->image))) {
-            unlink(public_path('venues/' . $venue->image));
+        if ($venue->image && file_exists(public_path('venue-images/' . $venue->image))) {
+            unlink(public_path('venue-images/' . $venue->image));
         }
 
         $venue->delete();

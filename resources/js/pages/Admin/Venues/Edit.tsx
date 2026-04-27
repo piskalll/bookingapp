@@ -23,7 +23,7 @@ export default function VenuesEdit({ venue }: Props) {
     });
 
     const [preview, setPreview] = useState<string | null>(
-        venue.image ? `/venues/${venue.image}` : null
+        venue.image ? `/venue-images/${venue.image}` : null
     );
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

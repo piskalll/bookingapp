@@ -6,18 +6,20 @@ use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\VenueController as AdminVenueController;
 use App\Http\Controllers\Admin\CourtController as AdminCourtController;
+use App\Http\Controllers\Owner\VenueController as OwnerVenueController;
+use App\Http\Controllers\Owner\CourtController as OwnerCourtController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
-
+Route::get('/venues', [VenueController::class, 'index'])->name('venues.index');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
     // Venues Routes
-    Route::get('/venues', [VenueController::class, 'index'])->name('venues.index');
+    
     Route::get('/api/venues', [VenueController::class, 'getVenuesWithCourts'])->name('api.venues');
 
     // Bookings Routes  
@@ -47,6 +49,16 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
 
         // Reports
         Route::get('/reports/export-pdf', [ReportController::class, 'exportPdf'])->name('reports.exportPdf');
+    });
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Rute yang bisa diakses Owner
+    Route::prefix('owner')->name('owner.')->group(function () {
+        Route::resource('venues', OwnerVenueController::class)->except(['show']);
+    
+    // Terapkan juga pada courts karena saat ini kita baru membuat index, create, store
+    Route::resource('venues.courts', OwnerCourtController::class)->except(['show']);
     });
 });
 

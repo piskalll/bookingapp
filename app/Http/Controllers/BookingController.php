@@ -7,6 +7,7 @@ use App\Models\Court;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Cache;
 
 class BookingController extends Controller
 {
@@ -48,41 +49,59 @@ class BookingController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
 
-        // Cek overlap dengan booking yang sudah ada
-        $existingBooking = Booking::where('court_id', $validated['court_id'])
-            ->where('booking_date', $validated['booking_date'])
-            ->where('status', '!=', 'cancelled')
-            ->where(function ($query) use ($validated) {
-                // Start time lebih kecil dari end time existing dan end time lebih besar dari start time existing
-                $query->whereRaw('start_time < ?', [$validated['end_time']])
-                    ->whereRaw('end_time > ?', [$validated['start_time']]);
-            })
-            ->first();
+        $lockKey = 'booking_court_' . $validated['court_id'] . '_' . $validated['booking_date'] . '_' . $validated['start_time'];
 
-        if ($existingBooking) {
+        // Mengunci proses selama 10 detik. Jika ada request lain masuk dengan key yang sama, dia harus antre/ditolak.
+        $lock = Cache::lock($lockKey, 10);
+
+        if ($lock->get()) {
+            try {
+                // --- PINDAHKAN PENGECEKAN DOUBLE BOOKING KE SINI ---
+                $existingBooking = Booking::where('court_id', $validated['court_id'])
+                    ->where('booking_date', $validated['booking_date'])
+                    ->where('status', '!=', 'cancelled')
+                    ->where(function ($query) use ($validated) {
+                        $query->whereRaw('start_time < ?', [$validated['end_time']])
+                            ->whereRaw('end_time > ?', [$validated['start_time']]);
+                    })
+                    ->first();
+
+                if ($existingBooking) {
+                    return back()->withErrors([
+                        'booking_date' => 'Lapangan sudah dipesan pada jam tersebut. Silakan pilih jam lain.',
+                    ]);
+                }
+
+                // Hitung harga total
+                $court = Court::find($validated['court_id']);
+                $startTime = strtotime($validated['start_time']);
+                $endTime = strtotime($validated['end_time']);
+                $hours = ceil(($endTime - $startTime) / 3600);
+                $totalPrice = $court->price_per_hour * $hours;
+
+                // Insert ke database
+                $booking = Booking::create([
+                    'user_id' => auth()->id(),
+                    'court_id' => $validated['court_id'],
+                    'booking_date' => $validated['booking_date'],
+                    'start_time' => $validated['start_time'],
+                    'end_time' => $validated['end_time'],
+                    'total_price' => $totalPrice,
+                    'status' => 'pending',
+                ]);
+
+                return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat!');
+                
+            } finally {
+                // Pastikan gembok dilepas setelah proses selesai (baik berhasil maupun gagal/error)
+                $lock->release();
+            }
+        } else {
+            // Jika request gagal mendapatkan gembok (artinya ada orang lain yang sedang memproses di milidetik yang sama)
             return back()->withErrors([
-                'booking_date' => 'Lapangan sudah dipesan pada jam tersebut. Silakan pilih jam lain.',
+                'booking_date' => 'Sistem sedang memproses pesanan lain untuk jadwal ini. Silakan coba lagi dalam beberapa detik.',
             ]);
         }
-
-        // Hitung harga total
-        $court = Court::find($validated['court_id']);
-        $startTime = strtotime($validated['start_time']);
-        $endTime = strtotime($validated['end_time']);
-        $hours = ceil(($endTime - $startTime) / 3600);
-        $totalPrice = $court->price_per_hour * $hours;
-
-        $booking = Booking::create([
-            'user_id' => auth()->id(),
-            'court_id' => $validated['court_id'],
-            'booking_date' => $validated['booking_date'],
-            'start_time' => $validated['start_time'],
-            'end_time' => $validated['end_time'],
-            'total_price' => $totalPrice,
-            'status' => 'pending',
-        ]);
-
-        return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat!');
     }
 
     /**

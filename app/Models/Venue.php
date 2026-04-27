@@ -20,4 +20,9 @@ class Venue extends Model
     {
         return $this->hasMany(Court::class);
     }
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

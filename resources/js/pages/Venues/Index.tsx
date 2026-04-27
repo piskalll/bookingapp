@@ -43,7 +43,7 @@ export default function VenuesIndex({ venues }: Props) {
                             <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
                                 {venue.image && (
                                     <img
-                                        src={venue.image}
+                                        src={`/venue-images/${venue.image}`}
                                         alt={venue.name}
                                         className="w-full h-48 object-cover rounded-lg mb-4"
                                     />

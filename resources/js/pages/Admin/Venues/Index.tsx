@@ -25,7 +25,7 @@ export default function VenuesIndex({ venues }: Props) {
     };
 
     const getImageUrl = (imageName: string | null) => {
-        return imageName ? `/venues/${imageName}` : null;
+        return imageName ? `/venue-images/${imageName}` : null;
     };
 
     return (
