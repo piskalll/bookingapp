@@ -1,23 +1,26 @@
-import { useState, useEffect } from 'react';
-import { useForm, Link } from '@inertiajs/react';
-import DatePicker from 'react-datepicker';
-import { format, parse, isBefore, startOfToday, addDays } from 'date-fns';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { format, addDays, isSameDay } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
-import 'react-datepicker/dist/react-datepicker.css';
-import { Button } from '@/components/ui/button';
-import { store as storeBooking } from '@/routes/bookings';
+import {
+    MapPin, Star, Clock, ArrowLeft, CheckCircle, Lock,
+    ChevronLeft, ChevronRight, Wifi, Car, ShowerHead,
+    LockKeyhole, Zap, Users,
+} from 'lucide-react';
 
-interface CourtBookingProps {
-    court: {
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+interface Court {
+    id: number;
+    name: string;
+    type: string;
+    price_per_hour: number;
+    venue: {
         id: number;
         name: string;
-        type: string;
-        price_per_hour: number;
-        venue: {
-            id: number;
-            name: string;
-            address: string;
-        };
+        address: string;
+        image?: string | null;
     };
 }
 
@@ -27,392 +30,557 @@ interface BookedSlot {
     endTime: string;
 }
 
-const OPERATING_HOURS = Array.from({ length: 15 }, (_, i) => {
-    const hour = 8 + i; // 08:00 hingga 22:00
-    return {
-        hour,
-        startTime: `${String(hour).padStart(2, '0')}:00`,
-        endTime: `${String(hour + 1).padStart(2, '0')}:00`,
-    };
-});
+interface CourtBookingProps {
+    court: Court;
+}
 
+/* ------------------------------------------------------------------ */
+/*  Sport icon helper                                                  */
+/* ------------------------------------------------------------------ */
+const sportIcons: Record<string, string> = {
+    futsal: '⚽', badminton: '🏸', basket: '🏀', basketball: '🏀',
+    tennis: '🎾', voli: '🏐', volleyball: '🏐',
+};
+function getSportIcon(type: string) {
+    return sportIcons[type.toLowerCase()] || '🏟️';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Facilities (static for demo)                                       */
+/* ------------------------------------------------------------------ */
+const facilities = [
+    { icon: Wifi, label: 'Wi-Fi Gratis' },
+    { icon: Car, label: 'Parkir Luas' },
+    { icon: ShowerHead, label: 'Ruang Shower' },
+    { icon: LockKeyhole, label: 'Locker Aman' },
+    { icon: Zap, label: 'Lampu LED' },
+    { icon: Users, label: 'Tribun Penonton' },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Fade-in hook                                                       */
+/* ------------------------------------------------------------------ */
+function useFadeIn(delay = 0) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const obs = new IntersectionObserver(
+            ([e]) => { if (e.isIntersecting) { setVisible(true); obs.unobserve(el); } },
+            { threshold: 0.1 },
+        );
+        obs.observe(el);
+        return () => obs.disconnect();
+    }, []);
+    return {
+        ref,
+        style: { transitionDelay: `${delay}ms` } as React.CSSProperties,
+        className: `transition-all duration-700 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`,
+    };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Time Slot button                                                   */
+/* ------------------------------------------------------------------ */
+function TimeSlotBtn({
+    time, state, onSelect,
+}: {
+    time: string;
+    state: 'available' | 'selected' | 'booked';
+    onSelect: () => void;
+}) {
+    if (state === 'booked') {
+        return (
+            <button disabled className="flex cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border-2 border-gray-100 bg-gray-100 px-3 py-3 text-sm font-semibold text-gray-400 line-through">
+                {time}
+                <Lock size={13} />
+            </button>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            className={`rounded-xl border-2 px-3 py-3 text-sm font-bold transition-all duration-200 active:scale-95 ${
+                state === 'selected'
+                    ? 'border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-400/40 ring-offset-2'
+                    : 'border-gray-200 bg-white text-slate-700 hover:border-emerald-400 hover:bg-emerald-50'
+            }`}
+        >
+            {time}
+        </button>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Horizontal Week Date Picker                                        */
+/* ------------------------------------------------------------------ */
+function WeekDatePicker({
+    selectedDate, onSelect,
+}: {
+    selectedDate: Date;
+    onSelect: (d: Date) => void;
+}) {
+    const [weekOffset, setWeekOffset] = useState(0);
+    const dates = Array.from({ length: 7 }, (_, i) => addDays(new Date(), weekOffset * 7 + i));
+
+    return (
+        <div>
+            <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-500">
+                    {format(dates[0], 'MMM yyyy', { locale: idLocale })}
+                </span>
+                <div className="flex gap-1">
+                    <button
+                        type="button"
+                        onClick={() => setWeekOffset((p) => Math.max(p - 1, 0))}
+                        disabled={weekOffset === 0}
+                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 disabled:opacity-30"
+                    >
+                        <ChevronLeft size={16} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setWeekOffset((p) => p + 1)}
+                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100"
+                    >
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1.5">
+                {dates.map((date) => {
+                    const isSelected = isSameDay(date, selectedDate);
+                    const isToday = isSameDay(date, new Date());
+                    return (
+                        <button
+                            key={date.toISOString()}
+                            type="button"
+                            onClick={() => onSelect(date)}
+                            className={`flex flex-col items-center rounded-xl px-1 py-2.5 text-center transition-all duration-200 ${
+                                isSelected
+                                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105'
+                                    : isToday
+                                      ? 'border-2 border-emerald-300 bg-emerald-50 text-emerald-700'
+                                      : 'border-2 border-transparent bg-slate-50 text-slate-600 hover:bg-slate-100'
+                            }`}
+                        >
+                            <span className={`text-[10px] font-bold uppercase tracking-wide ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
+                                {format(date, 'EEE', { locale: idLocale })}
+                            </span>
+                            <span className="mt-0.5 text-lg font-extrabold leading-none">
+                                {format(date, 'd')}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/* ================================================================== */
+/*  Main Component                                                     */
+/* ================================================================== */
 export default function CourtBooking({ court }: CourtBookingProps) {
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
-    const [selectedStartTime, setSelectedStartTime] = useState<string | null>(null);
-    const [selectedEndTime, setSelectedEndTime] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+    const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
+
+    // Build end_time from selected slots
+    const sortedSlots = [...selectedSlots].sort();
+    const firstSlot = sortedSlots[0] || '09:00';
+    const lastSlot = sortedSlots[sortedSlots.length - 1] || '09:00';
+    const lastHour = parseInt(lastSlot.split(':')[0]) + 1;
+    const endTime = `${String(lastHour).padStart(2, '0')}:00`;
+
+    const totalHours = selectedSlots.length;
+    const totalPrice = totalHours * court.price_per_hour;
 
     const { data, setData, post, processing, errors } = useForm({
         court_id: court.id,
-        booking_date: '',
-        start_time: '',
-        end_time: '',
+        booking_date: format(selectedDate, 'yyyy-MM-dd'),
+        start_time: firstSlot,
+        end_time: endTime,
     });
 
-    // Fetch booked slots ketika date berubah
+    // Sync form data when selections change
     useEffect(() => {
-        if (selectedDate) {
-            fetchBookedSlots(selectedDate);
-            const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-            setData('booking_date', formattedDate);
+        if (selectedSlots.length > 0) {
+            const sorted = [...selectedSlots].sort();
+            const last = sorted[sorted.length - 1];
+            const endH = parseInt(last.split(':')[0]) + 1;
+            setData((prev) => ({
+                ...prev,
+                booking_date: format(selectedDate, 'yyyy-MM-dd'),
+                start_time: sorted[0],
+                end_time: `${String(endH).padStart(2, '0')}:00`,
+            }));
+        } else {
+            setData((prev) => ({
+                ...prev,
+                booking_date: format(selectedDate, 'yyyy-MM-dd'),
+            }));
         }
-    }, [selectedDate]);
+    }, [selectedSlots, selectedDate]);
 
-    // Update end_time ketika start_time berubah
-    useEffect(() => {
-        if (selectedStartTime) {
-            const [hour] = selectedStartTime.split(':');
-            const endHour = String(parseInt(hour) + 1).padStart(2, '0');
-            const endTime = `${endHour}:00`;
-            setSelectedEndTime(endTime);
-            setData({
-                court_id: court.id,
-                booking_date: data.booking_date,
-                start_time: selectedStartTime,
-                end_time: endTime,
-            });
-        }
-    }, [selectedStartTime]);
-
-    const fetchBookedSlots = async (date: Date) => {
-        setLoading(true);
-        setError(null);
+    // Fetch booked slots whenever date changes
+    const fetchAvailability = useCallback(async () => {
+        setLoadingSlots(true);
         try {
-            const formattedDate = format(date, 'yyyy-MM-dd');
-            const response = await fetch(
-                `/api/bookings/check-availability?court_id=${court.id}&booking_date=${formattedDate}`,
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            const res = await fetch(
+                `/api/bookings/check-availability?court_id=${court.id}&booking_date=${dateStr}`,
             );
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch availability');
+            if (res.ok) {
+                const json = await res.json();
+                const booked = (json.booked_slots || []).map((s: BookedSlot) => s.startTime);
+                setBookedSlots(booked);
             }
-
-            const result = await response.json();
-            setBookedSlots(result.booked_slots || []);
-            setSelectedStartTime(null);
-            setSelectedEndTime(null);
-        } catch (err) {
-            setError('Gagal mengambil data ketersediaan. Silakan coba lagi.');
-            console.error(err);
+        } catch {
+            // silently fail
         } finally {
-            setLoading(false);
+            setLoadingSlots(false);
         }
+    }, [selectedDate, court.id]);
+
+    useEffect(() => {
+        fetchAvailability();
+        setSelectedSlots([]); // reset selection on date change
+    }, [fetchAvailability]);
+
+    // Generate time slots 06:00 – 21:00
+    const timeSlots = Array.from({ length: 16 }, (_, i) => {
+        const hour = 6 + i;
+        return `${String(hour).padStart(2, '0')}:00`;
+    });
+
+    // Toggle slot selection (only allow consecutive)
+    const toggleSlot = (time: string) => {
+        setSelectedSlots((prev) => {
+            if (prev.includes(time)) {
+                return prev.filter((t) => t !== time);
+            }
+            const next = [...prev, time].sort();
+            // Validate consecutive
+            for (let i = 1; i < next.length; i++) {
+                const prevH = parseInt(next[i - 1].split(':')[0]);
+                const currH = parseInt(next[i].split(':')[0]);
+                if (currH - prevH !== 1) {
+                    // Not consecutive: replace selection with just the clicked slot
+                    return [time];
+                }
+            }
+            return next;
+        });
     };
 
-    const isSlotBooked = (hour: number): boolean => {
-        return bookedSlots.some((slot) => slot.hour === hour);
+    const handleDateChange = (date: Date) => {
+        setSelectedDate(date);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (!selectedDate || !selectedStartTime || !selectedEndTime) {
-            setError('Silakan pilih tanggal dan jam terlebih dahulu.');
-            return;
-        }
-
-        // Ensure data is complete before submitting
-        const finalData = {
-            court_id: court.id,
-            booking_date: format(selectedDate, 'yyyy-MM-dd'),
-            start_time: selectedStartTime,
-            end_time: selectedEndTime,
-        };
-
-        post(storeBooking(), {
-            data: finalData,
-            onError: (errors) => {
-                console.error('Booking errors:', errors);
-                setError(errors.booking_date || 'Terjadi kesalahan. Silakan coba lagi.');
-            },
+        if (selectedSlots.length === 0) return;
+        post('/bookings', {
             onSuccess: () => {
-                console.log('Booking berhasil dibuat');
+                setShowSuccess(true);
+                setTimeout(() => {
+                    window.location.href = '/bookings';
+                }, 2000);
             },
         });
     };
 
-    const calculateTotalPrice = (): number => {
-        if (!selectedStartTime || !selectedEndTime) return 0;
-
-        const [startHour] = selectedStartTime.split(':');
-        const [endHour] = selectedEndTime.split(':');
-        const hours = parseInt(endHour) - parseInt(startHour);
-
-        return court.price_per_hour * hours;
-    };
-
-    const minDate = addDays(startOfToday(), 1);
-    const maxDate = addDays(startOfToday(), 7);
-
-    const totalPrice = calculateTotalPrice();
+    const infoFade = useFadeIn();
+    const galleryFade = useFadeIn(100);
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-6">
-            {/* Court Info Card */}
-            <div className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-3">{court.name}</h2>
-                        <div className="space-y-2">
-                            <p className="text-gray-700">
-                                <span className="font-semibold">Venue:</span> {court.venue.name}
-                            </p>
-                            <p className="text-gray-700">
-                                <span className="font-semibold">Lokasi:</span> {court.venue.address}
-                            </p>
-                            <p className="text-gray-700">
-                                <span className="font-semibold">Tipe:</span>{' '}
-                                <span className="capitalize px-2 py-1 bg-blue-200 text-blue-800 rounded">
-                                    {court.type}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
+        <>
+            <Head title={`Pesan ${court.name}`} />
 
-                    <div className="flex flex-col justify-center items-end">
-                        <p className="text-gray-600 mb-2">Harga per jam</p>
-                        <p className="text-4xl font-bold text-blue-600">
-                            Rp {court.price_per_hour.toLocaleString('id-ID')}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">Durasi minimum: 1 jam</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Error Alert */}
-            {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
-                    <span className="text-red-600 flex-shrink-0 text-xl">⚠️</span>
-                    <p className="text-red-800">{error}</p>
-                </div>
-            )}
-
-            {/* Main Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Date Picker Section */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Pilih Tanggal</h3>
-
-                    <div className="flex justify-center mb-6">
-                        <DatePicker
-                            selected={selectedDate}
-                            onChange={(date) => setSelectedDate(date)}
-                            minDate={minDate}
-                            maxDate={maxDate}
-                            dateFormat="dd MMMM yyyy"
-                            locale={idLocale}
-                            inline
-                            calendarClassName="border border-gray-200 rounded-lg shadow-lg"
-                            className="p-3 border border-gray-300 rounded-lg"
-                        />
-                    </div>
-
-                    {selectedDate && (
-                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                            <p className="text-blue-900">
-                                Tanggal dipilih:{' '}
-                                <span className="font-semibold">
-                                    {format(selectedDate, 'EEEE, dd MMMM yyyy', { locale: idLocale })}
-                                </span>
-                            </p>
-                        </div>
+            <div className="min-h-screen bg-slate-50">
+                {/* ===== HERO BANNER ===== */}
+                <div className="relative h-56 overflow-hidden bg-gradient-to-br from-slate-900 to-emerald-950 sm:h-72">
+                    {court.venue.image ? (
+                        <>
+                            <img
+                                src={`/uploads/venues/${court.venue.image}`}
+                                alt={court.venue.name}
+                                className="h-full w-full object-cover opacity-40"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/50 to-transparent" />
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600 to-teal-700 opacity-80" />
                     )}
+
+                    {/* Back nav */}
+                    <div className="absolute left-0 right-0 top-0 z-10 px-4 pt-4 sm:px-6 lg:px-8">
+                        <div className="mx-auto max-w-7xl">
+                            <Link
+                                href="/venues"
+                                className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
+                            >
+                                <ArrowLeft size={16} />
+                                Kembali
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Title overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 z-10 px-4 pb-6 sm:px-6 lg:px-8">
+                        <div className="mx-auto max-w-7xl">
+                            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
+                                {getSportIcon(court.type)} {court.type}
+                            </span>
+                            <h1 className="text-2xl font-extrabold text-white sm:text-3xl lg:text-4xl">{court.name}</h1>
+                            <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-300">
+                                <MapPin size={14} />
+                                <span>{court.venue.name} — {court.venue.address}</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Time Slots Section */}
-                {selectedDate && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Pilih Jam Operasional</h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Jam operasional: 08:00 - 23:00 | Durasi minimal: 1 jam
-                        </p>
-
-                        {loading && (
-                            <div className="text-center py-8">
-                                <div className="inline-block animate-spin text-3xl">⏳</div>
-                                <p className="text-gray-600 mt-2">Memuat ketersediaan...</p>
+                {/* ===== MAIN CONTENT: SPLIT LAYOUT ===== */}
+                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-5">
+                        {/* ────── LEFT COLUMN: Info ────── */}
+                        <div className="lg:col-span-3 space-y-6">
+                            {/* Gallery placeholder */}
+                            <div ref={galleryFade.ref} style={galleryFade.style} className={galleryFade.className}>
+                                <div className="overflow-hidden rounded-2xl shadow-lg">
+                                    {court.venue.image ? (
+                                        <img
+                                            src={`/uploads/venues/${court.venue.image}`}
+                                            alt={court.venue.name}
+                                            className="aspect-video w-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
+                                            <span className="text-8xl opacity-30">{getSportIcon(court.type)}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
 
-                        {!loading && (
-                            <>
-                                {/* Info Booked Slots */}
-                                {bookedSlots.length > 0 && (
-                                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                                        <h4 className="font-semibold text-amber-900 mb-2">Jam yang sudah dipesan:</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {bookedSlots.map((slot, idx) => (
-                                                <span
-                                                    key={idx}
-                                                    className="px-3 py-1 bg-amber-200 text-amber-800 rounded text-sm"
-                                                >
-                                                    {slot.startTime} - {slot.endTime}
-                                                </span>
+                            {/* Info card */}
+                            <div ref={infoFade.ref} style={infoFade.style} className={`rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8 ${infoFade.className}`}>
+                                {/* Stats row */}
+                                <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                                    <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                                        <div className="text-xl font-extrabold capitalize text-emerald-600">{court.type}</div>
+                                        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Jenis</div>
+                                    </div>
+                                    <div className="rounded-xl bg-emerald-50 p-4 text-center">
+                                        <div className="text-xl font-extrabold text-emerald-600">
+                                            Rp {court.price_per_hour.toLocaleString('id-ID')}
+                                        </div>
+                                        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Per Jam</div>
+                                    </div>
+                                    <div className="rounded-xl bg-amber-50 p-4 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star key={i} size={14} className="fill-amber-400 text-amber-400" />
                                             ))}
                                         </div>
+                                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Rating</div>
                                     </div>
-                                )}
+                                    <div className="rounded-xl bg-blue-50 p-4 text-center">
+                                        <div className="text-xl font-extrabold text-blue-600">4.8</div>
+                                        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Skor</div>
+                                    </div>
+                                </div>
 
-                                {/* Time Slots Grid */}
-                                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                    {OPERATING_HOURS.map((slot) => {
-                                        const isBooked = isSlotBooked(slot.hour);
-                                        const isSelected = selectedStartTime === slot.startTime;
+                                {/* Description */}
+                                <div className="mb-6">
+                                    <h3 className="mb-2 text-lg font-bold text-slate-900">Tentang Lapangan</h3>
+                                    <p className="leading-relaxed text-slate-500">
+                                        Lapangan {court.type} berkualitas tinggi dengan standar internasional.
+                                        Dilengkapi dengan pencahayaan LED profesional, lantai berkualitas premium,
+                                        dan lingkungan yang nyaman untuk bermain bersama teman maupun tim Anda.
+                                    </p>
+                                </div>
 
-                                        return (
-                                            <button
-                                                key={slot.hour}
-                                                type="button"
-                                                onClick={() => !isBooked && setSelectedStartTime(slot.startTime)}
-                                                disabled={isBooked}
-                                                className={`p-3 rounded-lg font-medium transition-all ${
-                                                    isBooked
-                                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
-                                                        : isSelected
-                                                          ? 'bg-green-600 text-white shadow-lg ring-2 ring-green-400'
-                                                          : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-blue-50'
-                                                }`}
-                                                title={isBooked ? 'Jam sudah dipesan' : ''}
+                                {/* Facilities */}
+                                <div>
+                                    <h3 className="mb-3 text-lg font-bold text-slate-900">Fasilitas</h3>
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                        {facilities.map((f) => (
+                                            <div
+                                                key={f.label}
+                                                className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-slate-50 px-4 py-3 text-sm text-slate-600"
                                             >
-                                                <div className="text-sm">{slot.startTime}</div>
-                                                <div className="text-xs opacity-75">
-                                                    {isBooked ? 'Penuh' : isSelected ? 'Dipilih' : 'Kosong'}
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* Selected Time Summary */}
-                {selectedDate && selectedStartTime && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                        <div className="flex items-start gap-3">
-                            <span className="text-green-600 flex-shrink-0 mt-1 text-xl">✅</span>
-                            <div className="flex-1">
-                                <h4 className="font-semibold text-green-900 mb-3">Ringkasan Pemesanan</h4>
-                                <div className="space-y-2 mb-4">
-                                    <p className="text-green-800">
-                                        <span className="font-medium">Tanggal:</span>{' '}
-                                        {format(selectedDate, 'EEEE, dd MMMM yyyy', { locale: idLocale })}
-                                    </p>
-                                    <p className="text-green-800">
-                                        <span className="font-medium">Jam:</span> {selectedStartTime} -
-                                        {selectedEndTime}
-                                    </p>
-                                    <p className="text-green-800">
-                                        <span className="font-medium">Durasi:</span> 1 jam
-                                    </p>
+                                                <f.icon size={18} className="shrink-0 text-emerald-500" />
+                                                <span className="font-medium">{f.label}</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
 
-                                <div className="border-t border-green-200 pt-3">
-                                    <p className="text-green-800 mb-2">
-                                        <span className="font-medium">Total Harga:</span>
-                                    </p>
-                                    <p className="text-3xl font-bold text-green-600">
-                                        Rp {totalPrice.toLocaleString('id-ID')}
-                                    </p>
+                                {/* Operating hours */}
+                                <div className="mt-6 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                                    <Clock size={18} className="mt-0.5 shrink-0 text-blue-500" />
+                                    <div className="text-sm">
+                                        <p className="font-bold text-blue-900">Jam Operasional</p>
+                                        <p className="text-blue-700">06:00 – 22:00 WIB, Buka Setiap Hari</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
+                        {/* ────── RIGHT COLUMN: Sticky Booking Panel ────── */}
+                        <div className="lg:col-span-2">
+                            <div className="lg:sticky lg:top-20">
+                                <form
+                                    onSubmit={handleSubmit}
+                                    className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg"
+                                >
+                                    {/* Panel header */}
+                                    <div className="border-b border-gray-100 bg-gradient-to-r from-emerald-500 to-teal-500 px-6 py-4">
+                                        <h2 className="text-lg font-extrabold text-white">Pesan Lapangan</h2>
+                                        <p className="text-sm text-emerald-100">Pilih tanggal dan jam bermain Anda</p>
+                                    </div>
+
+                                    <div className="space-y-5 p-5 sm:p-6">
+                                        {/* Date picker */}
+                                        <div>
+                                            <label className="mb-2 block text-sm font-bold text-slate-800">
+                                                📅 Pilih Tanggal
+                                            </label>
+                                            <WeekDatePicker
+                                                selectedDate={selectedDate}
+                                                onSelect={handleDateChange}
+                                            />
+                                        </div>
+
+                                        {/* Time slots */}
+                                        <div>
+                                            <label className="mb-2 block text-sm font-bold text-slate-800">
+                                                🕐 Pilih Jam
+                                            </label>
+
+                                            {loadingSlots ? (
+                                                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                                                    {Array.from({ length: 12 }).map((_, i) => (
+                                                        <div key={i} className="h-11 animate-pulse rounded-xl bg-gray-100" />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                                                    {timeSlots.map((time) => {
+                                                        const isBooked = bookedSlots.includes(time);
+                                                        const isSelected = selectedSlots.includes(time);
+                                                        return (
+                                                            <TimeSlotBtn
+                                                                key={time}
+                                                                time={time}
+                                                                state={isBooked ? 'booked' : isSelected ? 'selected' : 'available'}
+                                                                onSelect={() => toggleSlot(time)}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            {/* Legend */}
+                                            <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-slate-400">
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="h-3 w-3 rounded border border-gray-200 bg-white" /> Tersedia
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="h-3 w-3 rounded bg-emerald-500" /> Dipilih
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <span className="h-3 w-3 rounded bg-gray-200" /> Penuh
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Summary */}
+                                        {selectedSlots.length > 0 && (
+                                            <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-4">
+                                                <h4 className="mb-3 text-sm font-bold text-slate-800">Ringkasan Pesanan</h4>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-slate-500">Tanggal</span>
+                                                        <span className="font-semibold text-slate-800">
+                                                            {format(selectedDate, 'dd MMMM yyyy', { locale: idLocale })}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-slate-500">Waktu</span>
+                                                        <span className="font-semibold text-slate-800">
+                                                            {sortedSlots[0]} – {endTime}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-slate-500">Durasi</span>
+                                                        <span className="font-semibold text-slate-800">{totalHours} Jam</span>
+                                                    </div>
+                                                    <div className="flex justify-between border-t border-emerald-200 pt-2">
+                                                        <span className="text-slate-500">Harga/Jam</span>
+                                                        <span className="font-semibold text-slate-600">
+                                                            Rp {court.price_per_hour.toLocaleString('id-ID')}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-base font-bold text-slate-900">Total Bayar</span>
+                                                        <span className="text-base font-extrabold text-emerald-600">
+                                                            Rp {totalPrice.toLocaleString('id-ID')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Errors */}
+                                        {(errors.start_time || errors.booking_date) && (
+                                            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                                {errors.start_time || errors.booking_date}
+                                            </div>
+                                        )}
+
+                                        {/* Submit */}
+                                        <button
+                                            type="submit"
+                                            disabled={processing || selectedSlots.length === 0}
+                                            className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-500/25 transition-all duration-200 hover:shadow-xl hover:shadow-emerald-500/30 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {processing
+                                                ? 'Memproses...'
+                                                : selectedSlots.length === 0
+                                                  ? 'Pilih Jam Terlebih Dahulu'
+                                                  : `Lanjutkan Pembayaran — Rp ${totalPrice.toLocaleString('id-ID')}`}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     </div>
-                )}
-
-                {/* Form Errors */}
-                {(Object.keys(errors).length > 0 || Object.keys(data).some((key) => data[key as keyof typeof data] === '')) && !selectedDate && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-800">
-                            Silakan pilih tanggal dan jam terlebih dahulu
-                        </p>
-                    </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-4 pt-4">
-                    <Link href="/venues" className="flex-1">
-                        <Button variant="outline" className="w-full h-12">
-                            ← Kembali ke Daftar
-                        </Button>
-                    </Link>
-
-                    <button
-                        type="submit"
-                        disabled={processing || !selectedDate || !selectedStartTime || loading}
-                        className={`flex-1 h-12 font-semibold rounded-lg transition-all ${
-                            processing || !selectedDate || !selectedStartTime || loading
-                                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl'
-                        }`}
-                    >
-                        {processing ? 'Memproses...' : 'Konfirmasi Pemesanan'}
-                    </button>
                 </div>
-            </form>
 
-            {/* Custom DatePicker Styles */}
-            <style>{`
-                .react-datepicker {
-                    border-radius: 0.5rem;
-                    border: 1px solid #e5e7eb;
-                    font-family: inherit;
-                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-                }
-
-                .react-datepicker__header {
-                    background-color: #2563eb;
-                    border-radius: 0.5rem 0.5rem 0 0;
-                    color: white;
-                    padding: 1rem;
-                    border-bottom: 0;
-                }
-
-                .react-datepicker__current-month {
-                    color: white;
-                    font-weight: 600;
-                    font-size: 1rem;
-                }
-
-                .react-datepicker__navigation-icon::before {
-                    border-color: white;
-                }
-
-                .react-datepicker__day-names {
-                    background-color: #f9fafb;
-                    border-bottom: 1px solid #e5e7eb;
-                }
-
-                .react-datepicker__day--selected,
-                .react-datepicker__day--in-selecting-range,
-                .react-datepicker__day--in-range {
-                    background-color: #10b981;
-                    color: white;
-                    border-radius: 0.375rem;
-                }
-
-                .react-datepicker__day--disabled {
-                    background-color: #f3f4f6;
-                    color: #9ca3af;
-                    cursor: not-allowed;
-                }
-
-                .react-datepicker__day:hover:not(.react-datepicker__day--disabled) {
-                    background-color: #dbeafe;
-                    border-radius: 0.375rem;
-                }
-
-                .react-datepicker__day-name,
-                .react-datepicker__day {
-                    width: 2.5rem;
-                    line-height: 2.5rem;
-                    margin: 0.1rem;
-                    border-radius: 0.375rem;
-                }
-            `}</style>
-        </div>
+                {/* ===== SUCCESS MODAL ===== */}
+                {showSuccess && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                        <div className="w-full max-w-sm rounded-2xl bg-white p-8 text-center shadow-2xl">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                                <CheckCircle size={36} className="text-emerald-500" />
+                            </div>
+                            <h3 className="mb-2 text-2xl font-extrabold text-slate-900">Pesanan Berhasil!</h3>
+                            <p className="text-sm text-slate-500">
+                                Lapangan Anda telah dipesan. Anda akan dialihkan ke halaman pembayaran...
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
     );
 }

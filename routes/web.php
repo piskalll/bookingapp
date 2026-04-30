@@ -1,17 +1,19 @@
 <?php
 
-use App\Http\Controllers\BookingController;
-use App\Http\Controllers\VenueController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\CourtController as AdminCourtController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\VenueController as AdminVenueController;
-use App\Http\Controllers\Admin\CourtController as AdminCourtController;
-use App\Http\Controllers\Owner\VenueController as OwnerVenueController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\Owner\BookingController as OwnerBookingController;
 use App\Http\Controllers\Owner\CourtController as OwnerCourtController;
+use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\VenueController as OwnerVenueController;
+use App\Http\Controllers\VenueController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-Route::inertia('/', 'welcome', [
+Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
 Route::get('/venues', [VenueController::class, 'index'])->name('venues.index');
@@ -19,15 +21,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
     // Venues Routes
-    
+
     Route::get('/api/venues', [VenueController::class, 'getVenuesWithCourts'])->name('api.venues');
 
-    // Bookings Routes  
+    // Bookings Routes
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create/{court}', [BookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
     Route::post('/bookings/{booking}/payment', [BookingController::class, 'storePayment'])->name('bookings.storePayment');
-    
+
     // API Routes untuk Availability
     Route::get('/api/bookings/check-availability', [BookingController::class, 'checkAvailability'])->name('api.bookings.check-availability');
     Route::get('/api/bookings/available-slots/{court}/{date}', [BookingController::class, 'getAvailableSlots'])->name('api.bookings.available-slots');
@@ -55,10 +57,17 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     // Rute yang bisa diakses Owner
     Route::prefix('owner')->name('owner.')->group(function () {
+        // Dashboard
+        Route::get('/dashboard', [OwnerDashboardController::class, 'index'])->name('dashboard');
+
+        // Bookings
+        Route::get('/bookings', [OwnerBookingController::class, 'index'])->name('bookings.index');
+
+        // Venues
         Route::resource('venues', OwnerVenueController::class)->except(['show']);
-    
-    // Terapkan juga pada courts karena saat ini kita baru membuat index, create, store
-    Route::resource('venues.courts', OwnerCourtController::class)->except(['show']);
+
+        // Courts
+        Route::resource('venues.courts', OwnerCourtController::class)->except(['show']);
     });
 });
 
