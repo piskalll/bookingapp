@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { Head, Link } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight, CheckCircle2, XCircle, FileImage } from 'lucide-react';
 
 // Types
 interface Booking {
@@ -14,7 +14,9 @@ interface Booking {
     start_time: string;
     end_time: string;
     total_price: number;
-    status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
+    admin_fee: number;
+    owner_revenue: number;
+    status: 'pending' | 'waiting_confirmation' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
     payment_proof: string | null;
     created_at: string;
 }
@@ -43,16 +45,17 @@ interface StatusBadgeProps {
     status: Booking['status'];
 }
 
-const StatusBadge = ({ status }: StatusBadgeProps) => {
-    const statusConfig: Record<Booking['status'], { bg: string; text: string; border: string; label: string }> = {
-        pending: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Menunggu' },
-        confirmed: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Terkonfirmasi' },
-        completed: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'Selesai' },
-        cancelled: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Dibatalkan' },
-        rejected: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Ditolak' },
+const StatusBadge = ({ status }: { status: string }) => {
+    const statusConfig: Record<string, { bg: string; text: string; border: string; label: string }> = {
+        pending:              { bg: 'bg-amber-50',     text: 'text-amber-700',   border: 'border-amber-200',   label: 'Menunggu' },
+        waiting_confirmation: { bg: 'bg-blue-50',      text: 'text-blue-700',    border: 'border-blue-200',    label: 'Cek Pembayaran' },
+        confirmed:            { bg: 'bg-emerald-50',   text: 'text-emerald-700', border: 'border-emerald-200', label: 'Terkonfirmasi' },
+        completed:            { bg: 'bg-gray-100',     text: 'text-gray-700',    border: 'border-gray-300',    label: 'Selesai' },
+        cancelled:            { bg: 'bg-red-50',       text: 'text-red-700',     border: 'border-red-200',     label: 'Dibatalkan' },
+        rejected:             { bg: 'bg-red-50',       text: 'text-red-700',     border: 'border-red-200',     label: 'Ditolak' },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', label: status };
 
     return (
         <span
@@ -129,10 +132,13 @@ export default function OwnerBookingsIndex({ bookings }: Props) {
                                             Tanggal & Waktu
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Nominal
+                                            Pendapatan
                                         </th>
                                         <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                                             Status
+                                        </th>
+                                        <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                                            Aksi
                                         </th>
                                     </tr>
                                 </thead>
@@ -167,12 +173,59 @@ export default function OwnerBookingsIndex({ bookings }: Props) {
                                                 </p>
                                             </td>
                                             <td className="whitespace-nowrap px-6 py-4">
-                                                <p className="font-semibold text-gray-900 dark:text-white">
-                                                    {formatPrice(booking.total_price)}
-                                                </p>
+                                                <div className="flex flex-col">
+                                                    <p className="font-semibold text-emerald-600 dark:text-emerald-400" title="Pendapatan Bersih Anda">
+                                                        {formatPrice(booking.owner_revenue)}
+                                                    </p>
+                                                    <p className="text-xs text-gray-400" title="Total Harga Customer">
+                                                        <span className="line-through opacity-70 mr-1">{formatPrice(booking.total_price)}</span>
+                                                    </p>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <StatusBadge status={booking.status} />
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {booking.payment_proof && (
+                                                        <a
+                                                            href={`/storage/${booking.payment_proof}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                                            title="Lihat Bukti Pembayaran"
+                                                        >
+                                                            <FileImage size={16} />
+                                                        </a>
+                                                    )}
+                                                    
+                                                    {(booking.status === 'pending' || booking.status === 'waiting_confirmation') && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if(confirm('Terima dan konfirmasi pesanan ini?')) {
+                                                                        router.put(`/owner/bookings/${booking.id}/approve`);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+                                                                title="Konfirmasi Pesanan"
+                                                            >
+                                                                <CheckCircle2 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if(confirm('Tolak pesanan ini?')) {
+                                                                        router.put(`/owner/bookings/${booking.id}/reject`);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-red-600 bg-red-50 dark:bg-red-900/30 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                                                                title="Tolak Pesanan"
+                                                            >
+                                                                <XCircle size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

@@ -44,7 +44,7 @@ class BookingController extends Controller
     {
         $validated = $request->validate([
             'court_id' => 'required|exists:courts,id',
-            'booking_date' => 'required|date|after:today',
+            'booking_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
@@ -73,21 +73,29 @@ class BookingController extends Controller
                 }
 
                 // Hitung harga total
-                $court = Court::find($validated['court_id']);
+                $court = Court::with('venue.owner')->find($validated['court_id']);
                 $startTime = strtotime($validated['start_time']);
                 $endTime = strtotime($validated['end_time']);
                 $hours = ceil(($endTime - $startTime) / 3600);
                 $totalPrice = $court->price_per_hour * $hours;
 
+                // ── Logika Komisi ──
+                // Ambil commission_rate dari owner pemilik venue lapangan ini (default 5%)
+                $commissionRate = $court->venue?->owner?->commission_rate ?? 5.00;
+                $adminFee       = (int) round(($totalPrice * $commissionRate) / 100);
+                $ownerRevenue   = $totalPrice - $adminFee;
+
                 // Insert ke database
                 $booking = Booking::create([
-                    'user_id' => auth()->id(),
-                    'court_id' => $validated['court_id'],
-                    'booking_date' => $validated['booking_date'],
-                    'start_time' => $validated['start_time'],
-                    'end_time' => $validated['end_time'],
-                    'total_price' => $totalPrice,
-                    'status' => 'pending',
+                    'user_id'       => auth()->id(),
+                    'court_id'      => $validated['court_id'],
+                    'booking_date'  => $validated['booking_date'],
+                    'start_time'    => $validated['start_time'],
+                    'end_time'      => $validated['end_time'],
+                    'total_price'   => $totalPrice,
+                    'admin_fee'     => $adminFee,
+                    'owner_revenue' => $ownerRevenue,
+                    'status'        => 'pending',
                 ]);
 
                 return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat!');

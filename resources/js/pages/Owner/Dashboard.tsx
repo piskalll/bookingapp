@@ -1,10 +1,8 @@
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Head, Link } from '@inertiajs/react';
-import { DollarSign, Home, Layout, Clock } from 'lucide-react';
-import type { BreadcrumbItem } from '@/types';
+import { DollarSign, Home, Layout, Clock, AlertTriangle, XCircle, TrendingDown } from 'lucide-react';
 
-// Interfaces untuk type safety
 interface Booking {
     id: number;
     customer_name: string;
@@ -13,6 +11,8 @@ interface Booking {
     start_time: string;
     end_time: string;
     total_price: number;
+    admin_fee: number;
+    owner_revenue: number;
     status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected';
     created_at: string;
 }
@@ -24,181 +24,165 @@ interface Statistics {
     pending_bookings_count: number;
 }
 
+interface SubscriptionAlert {
+    type: 'warning' | 'danger';
+    message: string;
+}
+
 interface Props {
     statistics: Statistics;
     recent_bookings: Booking[];
+    subscription_alert: SubscriptionAlert | null;
+    subscription_ends_at: string | null;
 }
 
-// Breadcrumbs
-const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/owner/dashboard' },
-];
-
-// Status Badge Component
-interface StatusBadgeProps {
-    status: Booking['status'];
-}
-
-const StatusBadge = ({ status }: StatusBadgeProps) => {
-    const statusConfig: Record<Booking['status'], { bg: string; text: string; border: string; label: string }> = {
-        pending: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Menunggu' },
-        confirmed: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Terkonfirmasi' },
-        completed: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', label: 'Selesai' },
-        cancelled: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Dibatalkan' },
-        rejected: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', label: 'Ditolak' },
+// ── Status Badge ──────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }: { status: string }) => {
+    const cfg: Record<string, { bg: string; text: string; label: string }> = {
+        pending:              { bg: 'bg-amber-50 border border-amber-200',   text: 'text-amber-700',   label: 'Menunggu' },
+        waiting_confirmation: { bg: 'bg-blue-50 border border-blue-200',     text: 'text-blue-700',    label: 'Cek Pembayaran' },
+        confirmed:            { bg: 'bg-emerald-50 border border-emerald-200',text: 'text-emerald-700', label: 'Terkonfirmasi' },
+        completed:            { bg: 'bg-gray-100 border border-gray-300',    text: 'text-gray-700',    label: 'Selesai' },
+        cancelled:            { bg: 'bg-red-50 border border-red-200',       text: 'text-red-700',     label: 'Dibatalkan' },
+        rejected:             { bg: 'bg-red-50 border border-red-200',       text: 'text-red-700',     label: 'Ditolak' },
     };
-
-    const config = statusConfig[status];
-
+    
+    const c = cfg[status] || { bg: 'bg-gray-100 border border-gray-300', text: 'text-gray-700', label: status };
+    
     return (
-        <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${config.bg} ${config.text} ${config.border}`}
-        >
-            {config.label}
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>
+            {c.label}
         </span>
     );
 };
 
-// Stat Card Component
+// ── Stat Card ─────────────────────────────────────────────────────────────────
 interface StatCardProps {
-    icon: React.ComponentType<{ size: number; className: string }>;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
     label: string;
     value: string | number;
+    sub?: string;
 }
-
-const StatCard = ({ icon: Icon, label, value }: StatCardProps) => (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-md transition-all hover:shadow-lg dark:border-gray-700 dark:bg-gray-800">
+const StatCard = ({ icon: Icon, label, value, sub }: StatCardProps) => (
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between">
             <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{label}</p>
-                <p className="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
                     {typeof value === 'number' ? value.toLocaleString('id-ID') : value}
                 </p>
+                {sub && <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">{sub}</p>}
             </div>
-            <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 p-3 dark:from-gray-700 dark:to-gray-600">
-                <Icon size={24} className="text-gray-700 dark:text-gray-300" />
+            <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-3">
+                <Icon size={22} className="text-gray-600 dark:text-gray-300" />
             </div>
         </div>
     </div>
 );
 
-export default function OwnerDashboard({ statistics, recent_bookings }: Props) {
+export default function OwnerDashboard({ statistics, recent_bookings, subscription_alert }: Props) {
     const formatDateTime = (date: string, time: string) => {
         try {
-            const dateObj = new Date(date);
-            const dateFormatted = format(dateObj, 'dd MMM yyyy', { locale: id });
-            return `${dateFormatted} ${time}`;
-        } catch (e) {
-            return `${date} ${time}`;
-        }
+            return `${format(new Date(date), 'dd MMM yyyy', { locale: id })} ${time}`;
+        } catch { return `${date} ${time}`; }
     };
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('id-ID', {
-            style: 'currency',
-            currency: 'IDR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(price);
-    };
+    const formatRp = (n: number) =>
+        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
 
     return (
         <>
             <Head title="Dashboard Owner" />
 
-            <div className="flex-1 space-y-6 p-6">
+            <div className="flex-1 space-y-5 p-6">
+                {/* ── Subscription Alert Banner ── */}
+                {subscription_alert && (
+                    <div
+                        className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${
+                            subscription_alert.type === 'danger'
+                                ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700 dark:text-red-300'
+                                : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300'
+                        }`}
+                    >
+                        {subscription_alert.type === 'danger'
+                            ? <XCircle size={18} className="shrink-0 mt-0.5" />
+                            : <AlertTriangle size={18} className="shrink-0 mt-0.5" />}
+                        <span>{subscription_alert.message}</span>
+                    </div>
+                )}
+
                 {/* Header */}
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard Owner</h1>
-                    <p className="mt-1 text-gray-600 dark:text-gray-400">
-                        Kelola dan pantau bisnis penyewaan lapangan Anda
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Owner</h1>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Kelola dan pantau bisnis penyewaan lapangan Anda.
                     </p>
                 </div>
 
                 {/* Statistics Grid */}
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                        icon={Home}
-                        label="Total Venue"
-                        value={statistics.total_venues}
-                    />
-                    <StatCard
-                        icon={Layout}
-                        label="Total Lapangan"
-                        value={statistics.total_courts}
-                    />
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                    <StatCard icon={Home}      label="Total Venue"      value={statistics.total_venues} />
+                    <StatCard icon={Layout}    label="Total Lapangan"   value={statistics.total_courts} />
                     <StatCard
                         icon={DollarSign}
-                        label="Pendapatan Bulan Ini"
-                        value={formatPrice(statistics.monthly_revenue)}
+                        label="Pendapatan Bersih Bulan Ini"
+                        value={formatRp(statistics.monthly_revenue)}
+                        sub="Setelah potongan komisi"
                     />
-                    <StatCard
-                        icon={Clock}
-                        label="Pesanan Menunggu"
-                        value={statistics.pending_bookings_count}
-                    />
+                    <StatCard icon={Clock}     label="Pesanan Menunggu" value={statistics.pending_bookings_count} />
                 </div>
 
-                {/* Recent Bookings Section */}
-                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
-                    {/* Header */}
-                    <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white px-6 py-4 dark:border-gray-700 dark:from-gray-700 dark:to-gray-800">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Pesanan Terbaru</h2>
+                {/* Recent Bookings */}
+                <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+                    <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-700 dark:to-gray-800">
+                        <h2 className="text-base font-bold text-gray-900 dark:text-white">Pesanan Terbaru</h2>
                     </div>
 
-                    {/* Table */}
                     <div className="overflow-x-auto">
                         {recent_bookings.length > 0 ? (
-                            <table className="w-full">
+                            <table className="w-full min-w-[700px]">
                                 <thead>
-                                    <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700/50">
-                                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Penyewa
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Lapangan
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Waktu
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Nominal
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Status
-                                        </th>
+                                    <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                                        {['Penyewa','Lapangan','Waktu','Total','Komisi Admin','Bersih Anda','Status'].map((h) => (
+                                            <th key={h} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                                                {h}
+                                            </th>
+                                        ))}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {recent_bookings.map((booking, index) => (
+                                    {recent_bookings.map((booking, i) => (
                                         <tr
                                             key={booking.id}
-                                            className={`border-b transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                                                index !== recent_bookings.length - 1
+                                            className={`border-b transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 ${
+                                                i !== recent_bookings.length - 1
                                                     ? 'border-gray-200 dark:border-gray-700'
-                                                    : 'border-gray-100 dark:border-gray-700'
+                                                    : 'border-transparent'
                                             }`}
                                         >
-                                            <td className="whitespace-nowrap px-6 py-4">
-                                                <p className="font-medium text-gray-900 dark:text-white">{booking.customer_name}</p>
+                                            <td className="px-5 py-3.5 font-medium text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                                                {booking.customer_name}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-gray-700 dark:text-gray-300">{booking.court_name}</p>
+                                            <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                                                {booking.court_name}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                    {formatDateTime(booking.booking_date, booking.start_time)}
-                                                </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-500">
-                                                    {booking.start_time} - {booking.end_time}
-                                                </p>
+                                            <td className="px-5 py-3.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                {formatDateTime(booking.booking_date, booking.start_time)}
                                             </td>
-                                            <td className="whitespace-nowrap px-6 py-4">
-                                                <p className="font-semibold text-gray-900 dark:text-white">
-                                                    {formatPrice(booking.total_price)}
-                                                </p>
+                                            <td className="px-5 py-3.5 text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                                {formatRp(booking.total_price)}
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-5 py-3.5">
+                                                <span className="text-xs font-semibold text-violet-600 dark:text-violet-400 flex items-center gap-1">
+                                                    <TrendingDown size={12} /> {formatRp(booking.admin_fee)}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-3.5">
+                                                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatRp(booking.owner_revenue)}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-3.5">
                                                 <StatusBadge status={booking.status} />
                                             </td>
                                         </tr>
@@ -206,44 +190,19 @@ export default function OwnerDashboard({ statistics, recent_bookings }: Props) {
                                 </tbody>
                             </table>
                         ) : (
-                            <div className="px-6 py-12 text-center">
-                                <svg
-                                    className="mx-auto mb-4 h-12 w-12 text-gray-400"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                </svg>
-                                <p className="font-medium text-gray-600 dark:text-gray-400">Belum ada pesanan</p>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-500">Pesanan Anda akan ditampilkan di sini</p>
+                            <div className="px-6 py-12 text-center text-gray-400 text-sm">
+                                Belum ada pesanan masuk.
                             </div>
                         )}
                     </div>
 
-                    {/* Footer with action button */}
-                    <div className="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-700/50">
-                        <div className="flex justify-end">
-                            <Link
-                                href="/owner/bookings"
-                                className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-2.5 font-medium text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-lg dark:from-blue-700 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-900"
-                            >
-                                <span>Lihat Semua Pesanan</span>
-                                <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 5l7 7-7 7"
-                                    />
-                                </svg>
-                            </Link>
-                        </div>
+                    <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 px-6 py-3 flex justify-end">
+                        <Link
+                            href="/owner/bookings"
+                            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-sm font-semibold text-white shadow hover:from-emerald-700 hover:to-teal-700 transition"
+                        >
+                            Lihat Semua Pesanan
+                        </Link>
                     </div>
                 </div>
             </div>

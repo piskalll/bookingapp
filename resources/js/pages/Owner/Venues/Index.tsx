@@ -1,138 +1,94 @@
 import { Head, Link } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-
-// Mendefinisikan tipe data sesuai dengan relasi yang dikirim dari Controller
-interface Court {
-    id: number;
-    name: string;
-    type: string;
-    price_per_hour: number;
-}
+import { Building2, MapPin, Edit, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 
 interface Venue {
     id: number;
     name: string;
     address: string;
     image: string | null;
-    courts: Court[];
+    courts_count: number;
 }
 
 interface Props {
     venues: Venue[];
+    flash?: { success?: string; error?: string };
 }
 
-// Breadcrumbs untuk navigasi atas
-const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Kelola Tempat', href: '#' },
-];
-
-export default function OwnerVenuesIndex({ venues }: Props) {
+export default function OwnerVenuesIndex({ venues, flash }: Props) {
     return (
-        <div breadcrumbs={breadcrumbs}>
-            <Head title="Kelola Tempat (Owner)" />
+        <>
+            <Head title="Tempat Olahraga Saya" />
 
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                {/* Header Section */}
-                <div className="sm:flex sm:items-center sm:justify-between mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Tempat Olahraga Anda</h1>
-                        <p className="mt-2 text-sm text-gray-700">
-                            Daftar semua tempat olahraga yang Anda kelola, termasuk informasi alamat dan jumlah lapangan.
-                        </p>
+            <div className="p-6 space-y-6">
+                {/* Flash Message */}
+                {flash?.success && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
+                        <CheckCircle2 size={16} />
+                        {flash.success}
                     </div>
-                    <div className="mt-4 sm:mt-0">
-                        {/* Tombol Tambah Venue */}
-                        <Link
-                            href="/owner/venues/create" // Sesuaikan dengan route Anda
-                            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:w-auto"
-                        >
-                            Tambah Tempat Baru
-                        </Link>
-                    </div>
+                )}
+
+                {/* Header */}
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tempat Olahraga Saya</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Daftar tempat olahraga yang ditugaskan kepada Anda.
+                    </p>
                 </div>
 
-                {/* Table Section */}
-                <div className="mt-8 flex flex-col">
-                    <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-                            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                                <table className="min-w-full divide-y divide-gray-300">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                                                Info Tempat
-                                            </th>
-                                            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                                Alamat
-                                            </th>
-                                            <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-gray-900">
-                                                Jumlah Lapangan
-                                            </th>
-                                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6 text-right">
-                                                <span className="sr-only">Aksi</span>
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 bg-white">
-                                        {venues.length > 0 ? (
-                                            venues.map((venue) => (
-                                                <tr key={venue.id}>
-                                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-                                                        <div className="flex items-center">
-                                                            <div className="h-10 w-10 flex-shrink-0">
-                                                                {venue.image ? (
-                                                                    <img className="h-10 w-10 rounded-full object-cover border" src={`/uploads/venues/${venue.image}`} alt="" />
-                                                                ) : (
-                                                                    <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">
-                                                                        {venue.name.charAt(0)}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="ml-4">
-                                                                <div className="font-medium text-gray-900">{venue.name}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                        <div className="truncate max-w-xs">{venue.address}</div>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 text-center">
-                                                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                                                            {venue.courts.length} Lapangan
-                                                        </span>
-                                                    </td>
-                                                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                                        <Link href={`/owner/venues/${venue.id}/edit`} className="text-blue-600 hover:text-blue-900 mr-4">
-                                                            Edit<span className="sr-only">, {venue.name}</span>
-                                                        </Link>
-                                                        {/* Tombol ke halaman kelola court spesifik venue ini */}
-                                                        <Link href={`/owner/venues/${venue.id}/courts`} className="text-indigo-600 hover:text-indigo-900">
-                                                            Kelola Lapangan
-                                                        </Link>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={4} className="py-8 text-center text-sm text-gray-500">
-                                                    Anda belum memiliki tempat olahraga yang terdaftar. <br />
-                                                    Silakan klik "Tambah Tempat Baru" untuk mulai.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                {/* Venues Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {venues.length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-gray-500 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 border-dashed">
+                            Belum ada venue yang ditugaskan ke Anda.
                         </div>
-                    </div>
+                    ) : (
+                        venues.map((venue) => (
+                            <div key={venue.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col transition-shadow hover:shadow-md">
+                                {/* Image Section */}
+                                <div className="aspect-[4/3] relative bg-gray-100 dark:bg-gray-700">
+                                    {venue.image ? (
+                                        <img
+                                            src={`/uploads/venues/${venue.image}`}
+                                            alt={venue.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                                            <ImageIcon size={48} className="mb-2 opacity-50" />
+                                            <span className="text-sm font-medium">Belum ada foto</span>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+                                        <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                                            <Building2 size={14} className="text-emerald-600" />
+                                            {venue.courts_count} Lapangan
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Content Section */}
+                                <div className="p-5 flex flex-col flex-1">
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{venue.name}</h2>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex items-start gap-2 flex-1">
+                                        <MapPin size={16} className="shrink-0 text-emerald-500 mt-0.5" />
+                                        <span className="line-clamp-2" title={venue.address}>{venue.address}</span>
+                                    </p>
+                                    
+                                    <div className="pt-5 mt-auto border-t border-gray-100 dark:border-gray-700">
+                                        <Link
+                                            href={`/owner/venues/${venue.id}/edit`}
+                                            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold text-sm hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 transition"
+                                        >
+                                            <Edit size={16} /> Edit Info Tempat
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
-        </div>
+        </>
     );
 }
-
-OwnerVenuesIndex.layout = (page: React.ReactNode) => (
-    <AppLayout breadcrumbs={breadcrumbs}>{page}</AppLayout>
-);

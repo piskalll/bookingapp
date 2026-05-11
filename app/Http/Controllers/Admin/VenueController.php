@@ -2,120 +2,102 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class VenueController extends Controller
 {
-    /**
-     * Display a listing of the venues.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $venues = Venue::all()
-            ->map(fn ($venue) => [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'address' => $venue->address,
-                'image' => $venue->image,
-            ]);
+        $query = Venue::with('owner')->latest();
+        
+        if ($request->has('search')) {
+            $query->where('name', 'like', '%' . $request->search . '%');
+        }
+
+        $venues = $query->paginate(10)->withQueryString();
 
         return Inertia::render('Admin/Venues/Index', [
             'venues' => $venues,
+            'filters' => $request->only(['search']),
         ]);
     }
 
-    /**
-     * Show the form for creating a new venue.
-     */
     public function create()
     {
-        return Inertia::render('Admin/Venues/Create');
+        $owners = User::where('role', 'owner')->get(['id', 'name', 'subscription_status']);
+        
+        return Inertia::render('Admin/Venues/Create', [
+            'owners' => $owners,
+        ]);
     }
 
-    /**
-     * Store a newly created venue in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
             'name' => 'required|string|max:255',
-            'address' => 'required|string|max:500',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'address' => 'required|string',
+            'image' => 'nullable|image|max:2048',
         ]);
 
-        // Handle image upload
         if ($request->hasFile('image')) {
-            $imageName = time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-            $request->file('image')->move(public_path('venue-images'), $imageName);
-            $validated['image'] = $imageName;
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads/venues'), $filename);
+            $validated['image'] = $filename;
         }
 
         Venue::create($validated);
 
-        return redirect()->route('admin.venues.index')
-            ->with('success', 'Tempat olahraga berhasil ditambahkan');
+        return redirect()->route('admin.venues.index')->with('success', 'Venue berhasil ditambahkan.');
     }
 
-    /**
-     * Show the form for editing the specified venue.
-     */
     public function edit(Venue $venue)
     {
+        $owners = User::where('role', 'owner')->get(['id', 'name', 'subscription_status']);
+        
         return Inertia::render('Admin/Venues/Edit', [
-            'venue' => [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'address' => $venue->address,
-                'image' => $venue->image,
-            ],
+            'venue' => $venue,
+            'owners' => $owners,
         ]);
     }
 
-    /**
-     * Update the specified venue in storage.
-     */
     public function update(Request $request, Venue $venue)
     {
         $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
             'name' => 'required|string|max:255',
-            'address' => 'required|string|max:500',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'address' => 'required|string',
+            'image' => 'nullable|image|max:2048',
         ]);
 
-        // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image
-            if ($venue->image && file_exists(public_path('venue-images/' . $venue->image))) {
-                unlink(public_path('venue-images/' . $venue->image));
+            if ($venue->image && file_exists(public_path('uploads/venues/' . $venue->image))) {
+                @unlink(public_path('uploads/venues/' . $venue->image));
             }
-
-            $imageName = time() . '_' . uniqid() . '.' . $request->file('image')->getClientOriginalExtension();
-            $request->file('image')->move(public_path('venue-images'), $imageName);
-            $validated['image'] = $imageName;
+            $file = $request->file('image');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $file->move(public_path('uploads/venues'), $filename);
+            $validated['image'] = $filename;
         }
 
         $venue->update($validated);
 
-        return redirect()->route('admin.venues.index')
-            ->with('success', 'Tempat olahraga berhasil diperbarui');
+        return redirect()->route('admin.venues.index')->with('success', 'Venue berhasil diperbarui.');
     }
 
-    /**
-     * Remove the specified venue from storage.
-     */
     public function destroy(Venue $venue)
     {
-        // Delete image if exists
-        if ($venue->image && file_exists(public_path('venue-images/' . $venue->image))) {
-            unlink(public_path('venue-images/' . $venue->image));
+        if ($venue->image && file_exists(public_path('uploads/venues/' . $venue->image))) {
+            @unlink(public_path('uploads/venues/' . $venue->image));
         }
-
         $venue->delete();
 
-        return redirect()->route('admin.venues.index')
-            ->with('success', 'Tempat olahraga berhasil dihapus');
+        return redirect()->route('admin.venues.index')->with('success', 'Venue berhasil dihapus.');
     }
 }

@@ -1,7 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-import { FormEventHandler } from 'react';
+import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 interface Venue {
     id: number;
@@ -10,79 +9,132 @@ interface Venue {
     image: string | null;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Kelola Tempat', href: '/owner/venues' },
-    { label: 'Edit Tempat', href: '#' },
-];
+interface Props {
+    venue: Venue;
+}
 
-export default function EditVenue({ venue }: { venue: Venue }) {
+export default function OwnerVenuesEdit({ venue }: Props) {
     const { data, setData, post, processing, errors } = useForm({
+        _method: 'PUT',
         name: venue.name,
         address: venue.address,
         image: null as File | null,
-        _method: 'PUT', // Digunakan untuk mensimulasikan rute PUT saat mengirim file
     });
 
-    const submit: FormEventHandler = (e) => {
+    const [imagePreview, setImagePreview] = useState<string | null>(venue.image ? `/uploads/venues/${venue.image}` : null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setData('image', file);
+            const reader = new FileReader();
+            reader.onloadend = () => setImagePreview(reader.result as string);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Menggunakan post dengan _method: 'PUT' karena PHP/Laravel tidak bisa membaca file via rute PUT murni
-        post(`/owner/venues/${venue.id}`, {
-            forceFormData: true,
-        });
+        post(`/owner/venues/${venue.id}`);
     };
 
     return (
         <>
             <Head title={`Edit ${venue.name}`} />
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
-                <div className="bg-white shadow sm:rounded-lg p-6">
-                    <h3 className="text-lg font-medium text-gray-900">Ubah Informasi Tempat</h3>
-                    <form onSubmit={submit} className="mt-6 space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Nama Tempat</label>
-                            <input
-                                type="text"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name}</p>}
-                        </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Alamat</label>
-                            <textarea
-                                rows={3}
-                                value={data.address}
-                                onChange={(e) => setData('address', e.target.value)}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            {errors.address && <p className="text-red-600 text-xs mt-1">{errors.address}</p>}
-                        </div>
+            <div className="p-6 max-w-3xl mx-auto space-y-6">
+                <div className="flex items-center gap-4">
+                    <Link
+                        href="/owner/venues"
+                        className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                    >
+                        <ArrowLeft size={20} className="text-gray-600 dark:text-gray-300" />
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Info Tempat</h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Perbarui detail untuk {venue.name}.</p>
+                    </div>
+                </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Foto Baru (Opsional)</label>
-                            {venue.image && (
-                                <div className="mb-2">
-                                    <p className="text-xs text-gray-400 mb-1">Foto saat ini:</p>
-                                    <img src={`/uploads/venues/${venue.image}`} className="h-20 w-20 object-cover rounded border" alt="Existing" />
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 sm:p-8">
+                    <form onSubmit={submit} className="space-y-6">
+                        <div className="grid sm:grid-cols-2 gap-6">
+                            {/* Venue Name */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                    Nama Tempat <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={data.name}
+                                    onChange={(e) => setData('name', e.target.value)}
+                                    className={`w-full rounded-xl border ${errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-900 px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:text-white`}
+                                />
+                                {errors.name && <p className="text-sm text-red-500 mt-1.5">{errors.name}</p>}
+                            </div>
+
+                            {/* Address */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                    Alamat Lengkap <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    value={data.address}
+                                    onChange={(e) => setData('address', e.target.value)}
+                                    className={`w-full rounded-xl border ${errors.address ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-900 px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:text-white`}
+                                ></textarea>
+                                {errors.address && <p className="text-sm text-red-500 mt-1.5">{errors.address}</p>}
+                            </div>
+
+                            {/* Image Upload */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                    Foto/Gambar Tempat
+                                </label>
+                                <div 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`border-2 border-dashed ${errors.image ? 'border-red-400 bg-red-50' : 'border-gray-300 dark:border-gray-600 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/10'} rounded-2xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden`}
+                                >
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImageChange}
+                                        accept="image/jpeg,image/png,image/jpg"
+                                        className="hidden"
+                                    />
+                                    
+                                    {imagePreview ? (
+                                        <div className="absolute inset-0">
+                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-50" />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-900 drop-shadow-md font-semibold">
+                                                <Upload size={32} className="mb-2" />
+                                                <span>Klik untuk mengubah gambar</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+                                            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-3">
+                                                <Upload size={24} />
+                                            </div>
+                                            <p className="font-medium text-gray-700 dark:text-gray-300">Klik untuk mengunggah gambar baru</p>
+                                            <p className="text-xs mt-1">Biarkan kosong jika tidak ingin mengubah</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            <input
-                                type="file"
-                                onChange={(e) => setData('image', e.target.files ? e.target.files[0] : null)}
-                                className="mt-1 block w-full text-sm text-gray-500"
-                            />
+                                {errors.image && <p className="text-sm text-red-500 mt-1.5">{errors.image}</p>}
+                            </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t">
+                        <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end">
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm shadow-md hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-500/30 transition-all disabled:opacity-70"
                             >
-                                {processing ? 'Menyimpan...' : 'Perbarui Tempat'}
+                                <Save size={18} />
+                                {processing ? 'Menyimpan...' : 'Simpan Perubahan'}
                             </button>
                         </div>
                     </form>
@@ -91,7 +143,3 @@ export default function EditVenue({ venue }: { venue: Venue }) {
         </>
     );
 }
-
-EditVenue.layout = (page: React.ReactNode) => (
-    <AppLayout breadcrumbs={breadcrumbs}>{page}</AppLayout>
-);

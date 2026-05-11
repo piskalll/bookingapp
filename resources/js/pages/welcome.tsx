@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Search, Calendar, Trophy, ArrowRight, MapPin,
     Star, Facebook, Twitter, Instagram, Linkedin, Menu, X,
@@ -46,6 +46,9 @@ const steps = [
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
 export default function Welcome() {
+    const { auth } = usePage().props as any;
+    const user = auth?.user;
+
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
 
@@ -85,8 +88,16 @@ export default function Welcome() {
 
                             {/* Desktop CTA */}
                             <div className="hidden items-center gap-3 md:flex">
-                                <Link href="/login" className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${scrolled ? 'text-emerald-600 hover:text-emerald-700' : 'text-white hover:text-emerald-300'}`}>Masuk</Link>
-                                <Link href="/register" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700">Daftar</Link>
+                                {user ? (
+                                    <Link href="/dashboard" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700">
+                                        Dashboard
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <Link href="/login" className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${scrolled ? 'text-emerald-600 hover:text-emerald-700' : 'text-white hover:text-emerald-300'}`}>Masuk</Link>
+                                        <Link href="/register" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 transition hover:bg-emerald-700">Daftar</Link>
+                                    </>
+                                )}
                             </div>
 
                             {/* Mobile burger */}
@@ -102,8 +113,14 @@ export default function Welcome() {
                                     <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-gray-700 hover:text-emerald-600">{label}</a>
                                 ))}
                                 <div className="mt-2 flex gap-3 border-t border-gray-100 px-4 pt-4">
-                                    <Link href="/login" className="flex-1 rounded-lg border border-emerald-600 py-2 text-center text-sm font-semibold text-emerald-600">Masuk</Link>
-                                    <Link href="/register" className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-semibold text-white">Daftar</Link>
+                                    {user ? (
+                                        <Link href="/dashboard" className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-semibold text-white">Dashboard</Link>
+                                    ) : (
+                                        <>
+                                            <Link href="/login" className="flex-1 rounded-lg border border-emerald-600 py-2 text-center text-sm font-semibold text-emerald-600">Masuk</Link>
+                                            <Link href="/register" className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-semibold text-white">Daftar</Link>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -142,9 +159,15 @@ export default function Welcome() {
                                 Cari Lapangan Sekarang
                                 <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
                             </Link>
-                            <Link href="/register" className="w-full rounded-xl border-2 border-white/30 px-8 py-4 font-bold text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 sm:w-auto">
-                                Daftar Akun
-                            </Link>
+                            {user ? (
+                                <Link href="/dashboard" className="w-full rounded-xl border-2 border-white/30 px-8 py-4 font-bold text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 sm:w-auto">
+                                    Ke Dashboard
+                                </Link>
+                            ) : (
+                                <Link href="/register" className="w-full rounded-xl border-2 border-white/30 px-8 py-4 font-bold text-white backdrop-blur-sm transition-all duration-300 hover:border-white/60 hover:bg-white/10 sm:w-auto">
+                                    Daftar Akun
+                                </Link>
+                            )}
                         </div>
 
                         {/* Stats */}

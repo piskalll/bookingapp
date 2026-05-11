@@ -1,86 +1,114 @@
-import { Head, Link } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import type { BreadcrumbItem } from '@/types';
-
-interface Court {
-    id: number;
-    name: string;
-    type: string;
-    price_per_hour: number;
-}
+import { Head, Link, router } from '@inertiajs/react';
+import { Plus, Edit, Trash2, CheckCircle2, Layout, MapPin, DollarSign, Activity } from 'lucide-react';
 
 interface Venue {
     id: number;
     name: string;
-    courts: Court[];
 }
 
-export default function OwnerCourtsIndex({ venue }: { venue: Venue }) {
-    const breadcrumbs: BreadcrumbItem[] = [
-        { label: 'Dashboard', href: '/dashboard' },
-        { label: 'Kelola Tempat', href: '/owner/venues' },
-        { label: `Lapangan ${venue.name}`, href: '#' },
-    ];
+interface Court {
+    id: number;
+    venue_id: number;
+    name: string;
+    type: string;
+    price_per_hour: number;
+    venue: Venue;
+}
+
+interface Props {
+    courts: Court[];
+    flash?: { success?: string; error?: string };
+}
+
+export default function OwnerCourtsIndex({ courts, flash }: Props) {
+    const formatRp = (n: number) =>
+        new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+    const handleDelete = (court: Court) => {
+        if (confirm(`Hapus lapangan ${court.name}?`)) {
+            router.delete(`/owner/courts/${court.id}`);
+        }
+    };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Lapangan di ${venue.name}`} />
+        <>
+            <Head title="Kelola Lapangan" />
 
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                <div className="sm:flex sm:items-center sm:justify-between mb-6">
+            <div className="p-6 space-y-6">
+                {/* Flash Message */}
+                {flash?.success && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
+                        <CheckCircle2 size={16} />
+                        {flash.success}
+                    </div>
+                )}
+
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Daftar Lapangan</h1>
-                        <p className="mt-2 text-sm text-gray-700">
-                            Kelola lapangan yang ada di <strong>{venue.name}</strong>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Kelola Lapangan</h1>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            Atur lapangan olahraga di seluruh venue Anda.
                         </p>
                     </div>
-                    <div className="mt-4 sm:mt-0">
-                        <Link
-                            href={`/owner/venues/${venue.id}/courts/create`}
-                            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-                        >
-                            Tambah Lapangan
-                        </Link>
-                    </div>
+                    <Link
+                        href="/owner/courts/create"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium text-sm shadow-sm"
+                    >
+                        <Plus size={16} /> Tambah Lapangan
+                    </Link>
                 </div>
 
-                <div className="mt-8 flex flex-col">
-                    <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-                            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                                <table className="min-w-full divide-y divide-gray-300">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Nama Lapangan</th>
-                                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Jenis</th>
-                                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Harga/Jam</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 bg-white">
-                                        {venue.courts.length > 0 ? (
-                                            venue.courts.map((court) => (
-                                                <tr key={court.id}>
-                                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">{court.name}</td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 capitalize">{court.type}</td>
-                                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                                        Rp {court.price_per_hour.toLocaleString('id-ID')}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={3} className="py-8 text-center text-sm text-gray-500">
-                                                    Belum ada lapangan di tempat ini.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                {/* Courts Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {courts.length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-gray-500 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 border-dashed">
+                            Belum ada lapangan yang ditambahkan.
                         </div>
-                    </div>
+                    ) : (
+                        courts.map((court) => (
+                            <div key={court.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5 flex flex-col group hover:shadow-md transition-all">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                                        <Layout size={20} />
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Link
+                                            href={`/owner/courts/${court.id}/edit`}
+                                            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-lg transition"
+                                        >
+                                            <Edit size={16} />
+                                        </Link>
+                                        <button
+                                            onClick={() => handleDelete(court)}
+                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{court.name}</h3>
+                                
+                                <div className="mt-4 space-y-2.5 flex-1">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                        <MapPin size={14} className="text-gray-400" />
+                                        <span className="truncate" title={court.venue.name}>{court.venue.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                        <Activity size={14} className="text-gray-400" />
+                                        <span>{court.type}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                        <DollarSign size={14} className="text-gray-400" />
+                                        <span className="font-semibold text-gray-900 dark:text-white">{formatRp(court.price_per_hour)} / jam</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
-        </AppLayout>
+        </>
     );
 }

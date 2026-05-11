@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Head, usePage, useForm } from '@inertiajs/react';
-import { CheckCircle, Clock, XCircle, Eye, AlertCircle, FileText } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, Eye, AlertCircle, FileText, Calendar, CheckCircle2 } from 'lucide-react';
 import { approve, reject } from '@/routes/admin/bookings';
 import { dashboard } from '@/routes';
 
@@ -36,22 +36,22 @@ function ImagePreviewModal({ isOpen, imagePath, onClose }: ImagePreviewModalProp
     if (!isOpen || !imagePath) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
-                <div className="flex justify-between items-center p-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold">Preview Bukti Pembayaran</h3>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Preview Bukti Pembayaran</h3>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 font-bold text-2xl leading-none"
+                        className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
-                        ×
+                        <XCircle size={24} />
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="p-6 flex justify-center bg-gray-100 dark:bg-gray-900">
                     <img
                         src={`/storage/${imagePath}`}
                         alt="Payment Proof"
-                        className="w-full h-auto object-contain"
+                        className="max-h-[70vh] rounded-xl object-contain shadow-sm"
                     />
                 </div>
             </div>
@@ -84,25 +84,30 @@ function ConfirmDialog({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="p-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-                    <p className="text-gray-600 mb-6">{message}</p>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className={`p-3 rounded-full ${isDangerous ? 'bg-red-100 text-red-600 dark:bg-red-900/30' : 'bg-green-100 text-green-600 dark:bg-green-900/30'}`}>
+                            <AlertCircle size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">{message}</p>
 
                     <div className="flex gap-3">
                         <button
                             onClick={onCancel}
-                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition"
+                            className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-semibold transition-colors"
                         >
                             {cancelText}
                         </button>
                         <button
                             onClick={onConfirm}
-                            className={`flex-1 px-4 py-2 text-white rounded-lg font-medium transition ${
+                            className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all ${
                                 isDangerous
-                                    ? 'bg-red-600 hover:bg-red-700'
-                                    : 'bg-green-600 hover:bg-green-700'
+                                    ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                                    : 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
                             }`}
                         >
                             {confirmText}
@@ -185,26 +190,26 @@ export default function BookingManager({ bookings }: Props) {
     const getStatusBadge = (status: string) => {
         const statusConfig = {
             pending: {
-                bg: 'bg-yellow-100',
-                text: 'text-yellow-800',
+                bg: 'bg-amber-100 dark:bg-amber-900/30',
+                text: 'text-amber-800 dark:text-amber-300',
                 icon: Clock,
-                label: 'Menunggu Pembayaran',
+                label: 'Menunggu Bayar',
             },
             waiting_confirmation: {
-                bg: 'bg-orange-100',
-                text: 'text-orange-800',
+                bg: 'bg-blue-100 dark:bg-blue-900/30',
+                text: 'text-blue-800 dark:text-blue-300',
                 icon: AlertCircle,
-                label: 'Menunggu Konfirmasi',
+                label: 'Perlu Konfirmasi',
             },
             confirmed: {
-                bg: 'bg-green-100',
-                text: 'text-green-800',
+                bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+                text: 'text-emerald-800 dark:text-emerald-300',
                 icon: CheckCircle,
                 label: 'Terkonfirmasi',
             },
             cancelled: {
-                bg: 'bg-red-100',
-                text: 'text-red-800',
+                bg: 'bg-red-100 dark:bg-red-900/30',
+                text: 'text-red-800 dark:text-red-300',
                 icon: XCircle,
                 label: 'Dibatalkan',
             },
@@ -214,9 +219,9 @@ export default function BookingManager({ bookings }: Props) {
         const Icon = config.icon;
 
         return (
-            <div className={`flex items-center gap-1 px-3 py-1 rounded-full ${config.bg} ${config.text} w-fit`}>
-                <Icon size={16} />
-                <span className="text-sm font-medium">{config.label}</span>
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${config.bg} ${config.text}`}>
+                <Icon size={14} strokeWidth={2.5} />
+                <span className="text-xs font-bold whitespace-nowrap">{config.label}</span>
             </div>
         );
     };
@@ -224,10 +229,9 @@ export default function BookingManager({ bookings }: Props) {
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('id-ID', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
             day: 'numeric',
+            month: 'short',
+            year: 'numeric',
         });
     };
 
@@ -235,6 +239,7 @@ export default function BookingManager({ bookings }: Props) {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
+            minimumFractionDigits: 0
         }).format(amount);
     };
 
@@ -248,13 +253,11 @@ export default function BookingManager({ bookings }: Props) {
             return;
         }
 
-        // Validate date range
         if (startDate > endDate) {
             alert('Tanggal mulai harus lebih awal dari tanggal akhir');
             return;
         }
 
-        // Open PDF export URL in new tab
         const params = new URLSearchParams({
             start_date: startDate,
             end_date: endDate,
@@ -265,189 +268,176 @@ export default function BookingManager({ bookings }: Props) {
 
     return (
         <>
-            <Head title="Kelola Pesanan" />
+            <Head title="Semua Pesanan" />
 
-            <div className="p-6 max-w-7xl mx-auto">
+            <div className="p-6 space-y-6">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Kelola Pesanan</h1>
-                    <p className="text-gray-600 mt-2">
-                        Kelola dan konfirmasi pesanan pelanggan yang masuk
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Semua Pesanan</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Kelola dan konfirmasi pesanan pelanggan secara keseluruhan.
                     </p>
                 </div>
 
                 {/* Success Message */}
                 {flash?.success && (
-                    <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 flex gap-3">
-                        <CheckCircle size={20} className="flex-shrink-0" />
-                        <p>{flash.success}</p>
+                    <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl text-emerald-700 dark:text-emerald-300 text-sm font-medium">
+                        <CheckCircle2 size={18} className="shrink-0" />
+                        {flash.success}
                     </div>
                 )}
 
                 {/* Filter & Export Section */}
-                <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-4">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-5">
+                    <div className="flex flex-col md:flex-row md:items-end gap-4">
                         {/* Start Date */}
                         <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tanggal Mulai
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+                                Dari Tanggal
                             </label>
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                    <Calendar size={16} />
+                                </div>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:text-white transition"
+                                />
+                            </div>
                         </div>
 
                         {/* End Date */}
                         <div className="flex-1">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tanggal Akhir
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">
+                                Sampai Tanggal
                             </label>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                    <Calendar size={16} />
+                                </div>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-sm focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:text-white transition"
+                                />
+                            </div>
                         </div>
 
                         {/* Export Button */}
                         <button
                             onClick={handleExportPdf}
-                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition whitespace-nowrap"
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded-xl font-semibold text-sm transition shadow-lg shadow-gray-900/20 dark:shadow-white/10 w-full md:w-auto"
                         >
                             <FileText size={18} />
-                            Cetak Laporan PDF
+                            Export PDF
                         </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                        Filter untuk menampilkan laporan pendapatan pesanan yang telah dikonfirmasi dalam rentang tanggal tersebut.
-                    </p>
                 </div>
 
                 {/* Table Section */}
-                {bookings.length > 0 ? (
-                    <div className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Pemesan
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Lapangan
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Waktu
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Harga
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Bukti Bayar
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {bookings.map((booking, index) => (
-                                    <tr
-                                        key={booking.id}
-                                        className={`${
-                                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                        } border-b border-gray-200 hover:bg-blue-50 transition`}
-                                    >
-                                        {/* Nama Pemesan */}
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{booking.user_name}</p>
-                                                <p className="text-sm text-gray-600">{booking.user_email}</p>
-                                            </div>
-                                        </td>
-
-                                        {/* Lapangan */}
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className="font-medium text-gray-900">{booking.court_name}</p>
-                                                <p className="text-sm text-gray-600">{booking.venue_name}</p>
-                                            </div>
-                                        </td>
-
-                                        {/* Waktu */}
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <p className="text-sm text-gray-900">{formatDate(booking.booking_date)}</p>
-                                                <p className="text-sm text-gray-600">
-                                                    {booking.start_time} - {booking.end_time}
-                                                </p>
-                                            </div>
-                                        </td>
-
-                                        {/* Harga */}
-                                        <td className="px-6 py-4">
-                                            <p className="font-semibold text-gray-900">
-                                                {formatCurrency(booking.total_price)}
-                                            </p>
-                                        </td>
-
-                                        {/* Bukti Bayar */}
-                                        <td className="px-6 py-4">
-                                            {booking.payment_proof ? (
-                                                <button
-                                                    onClick={() => handleViewProof(booking.payment_proof)}
-                                                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-medium text-sm"
-                                                >
-                                                    <Eye size={16} />
-                                                    Lihat Bukti
-                                                </button>
-                                            ) : (
-                                                <span className="text-gray-500 text-sm">Belum ada bukti</span>
-                                            )}
-                                        </td>
-
-                                        {/* Status */}
-                                        <td className="px-6 py-4">{getStatusBadge(booking.status)}</td>
-
-                                        {/* Aksi */}
-                                        <td className="px-6 py-4">
-                                            {needsApproval(booking) ? (
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => handleApproveClick(booking.id)}
-                                                        disabled={approveProcessing}
-                                                        className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium text-sm disabled:opacity-50"
-                                                    >
-                                                        ✓ Setuju
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRejectClick(booking.id)}
-                                                        disabled={rejectProcessing}
-                                                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm disabled:opacity-50"
-                                                    >
-                                                        ✕ Tolak
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-500 text-sm">-</span>
-                                            )}
-                                        </td>
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+                    {bookings.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[1000px]">
+                                <thead>
+                                    <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-700/30">
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Pemesan</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tempat / Lapangan</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jadwal</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                        <th className="px-5 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : (
-                    <div className="text-center py-12 border border-gray-200 rounded-lg bg-gray-50">
-                        <p className="text-gray-600 text-lg">Tidak ada pesanan.</p>
-                    </div>
-                )}
+                                </thead>
+                                <tbody>
+                                    {bookings.map((booking) => (
+                                        <tr
+                                            key={booking.id}
+                                            className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors"
+                                        >
+                                            <td className="px-5 py-4">
+                                                <div className="font-semibold text-sm text-gray-900 dark:text-white">{booking.user_name}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{booking.user_email}</div>
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                <div className="font-medium text-sm text-gray-900 dark:text-white">{booking.venue_name}</div>
+                                                <div className="text-xs text-violet-600 dark:text-violet-400 font-medium mt-0.5">{booking.court_name}</div>
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
+                                                    <Calendar size={14} className="text-gray-400" />
+                                                    {formatDate(booking.booking_date)}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                    <Clock size={12} />
+                                                    {booking.start_time.slice(0,5)} - {booking.end_time.slice(0,5)}
+                                                </div>
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                <div className="font-bold text-sm text-gray-900 dark:text-white">
+                                                    {formatCurrency(booking.total_price)}
+                                                </div>
+                                                {booking.payment_proof && (
+                                                    <button
+                                                        onClick={() => handleViewProof(booking.payment_proof)}
+                                                        className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                                                    >
+                                                        <Eye size={12} /> Cek Bukti
+                                                    </button>
+                                                )}
+                                            </td>
+
+                                            <td className="px-5 py-4">
+                                                {getStatusBadge(booking.status)}
+                                            </td>
+
+                                            <td className="px-5 py-4 text-right">
+                                                {needsApproval(booking) ? (
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            onClick={() => handleRejectClick(booking.id)}
+                                                            disabled={rejectProcessing}
+                                                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-xl transition-colors disabled:opacity-50"
+                                                            title="Tolak Pesanan"
+                                                        >
+                                                            <XCircle size={18} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleApproveClick(booking.id)}
+                                                            disabled={approveProcessing}
+                                                            className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded-xl transition-colors disabled:opacity-50"
+                                                            title="Setujui Pesanan"
+                                                        >
+                                                            <CheckCircle2 size={18} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-gray-400 dark:text-gray-600 text-sm italic">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-16 px-4">
+                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                                <FileText size={24} className="text-gray-400 dark:text-gray-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Belum Ada Pesanan</h3>
+                            <p className="text-gray-500 dark:text-gray-400 text-center max-w-sm">
+                                Tidak ada data pesanan yang ditemukan untuk rentang tanggal ini.
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Image Preview Modal */}
@@ -462,15 +452,15 @@ export default function BookingManager({ bookings }: Props) {
                 isOpen={confirmDialog.isOpen}
                 title={
                     confirmDialog.action === 'approve'
-                        ? 'Konfirmasi Pesanan'
+                        ? 'Konfirmasi Pembayaran'
                         : 'Tolak Pesanan'
                 }
                 message={
                     confirmDialog.action === 'approve'
-                        ? 'Apakah Anda yakin ingin menyetujui pesanan ini?'
-                        : 'Apakah Anda yakin ingin menolak pesanan ini?'
+                        ? 'Tandai pesanan ini sebagai Lunas (Terkonfirmasi)? Pastikan Anda sudah mengecek bukti transfer.'
+                        : 'Apakah Anda yakin ingin menolak pesanan ini? Pesanan akan dibatalkan permanen.'
                 }
-                confirmText={confirmDialog.action === 'approve' ? 'Setuju' : 'Tolak'}
+                confirmText={confirmDialog.action === 'approve' ? 'Ya, Konfirmasi' : 'Ya, Tolak'}
                 cancelText="Batal"
                 isDangerous={confirmDialog.action === 'reject'}
                 onConfirm={handleConfirmAction}

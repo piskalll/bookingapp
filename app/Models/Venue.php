@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'address', 'image'])]
+#[Fillable(['user_id', 'name', 'address', 'image'])]
 class Venue extends Model
 {
     /** @use HasFactory<\Database\Factories\VenueFactory> */

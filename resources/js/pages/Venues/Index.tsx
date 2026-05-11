@@ -173,10 +173,10 @@ function VenueCard({ venue, index }: { venue: Venue; index: number }) {
                         </div>
 
                         <Link
-                            href={`/bookings/create/${venue.courts[0]?.id || 1}`}
+                            href={`/venues/${venue.id}`}
                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/20 group/btn"
                         >
-                            Lihat Jadwal
+                            Pilih Lapangan
                             <ArrowRight size={16} className="transition-transform group-hover/btn:translate-x-0.5" />
                         </Link>
                     </div>

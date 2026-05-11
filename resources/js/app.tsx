@@ -5,6 +5,8 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import CustomerLayout from '@/layouts/customer-layout';
+import AdminLayout from '@/layouts/admin-layout';
+import OwnerLayout from '@/layouts/owner-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -19,8 +21,19 @@ createInertiaApp({
                 return AuthLayout;
             case name.startsWith('settings/'):
                 return [CustomerLayout, SettingsLayout];
-            case name === 'dashboard' || name === 'Bookings/Index' || name === 'Bookings/Create' || name === 'Venues/Index':
+            // Customer pages — no sidebar
+            case name === 'dashboard' ||
+                name === 'Bookings/Index' ||
+                name === 'Bookings/Create' ||
+                name === 'Venues/Index' ||
+                name === 'Venues/Show':
                 return CustomerLayout;
+            // Admin pages — violet sidebar
+            case name.startsWith('Admin/'):
+                return AdminLayout;
+            // Owner pages — emerald sidebar
+            case name.startsWith('Owner/'):
+                return OwnerLayout;
             default:
                 return AppLayout;
         }

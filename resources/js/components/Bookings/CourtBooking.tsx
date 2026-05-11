@@ -197,7 +197,7 @@ export default function CourtBooking({ court }: CourtBookingProps) {
     const firstSlot = sortedSlots[0] || '09:00';
     const lastSlot = sortedSlots[sortedSlots.length - 1] || '09:00';
     const lastHour = parseInt(lastSlot.split(':')[0]) + 1;
-    const endTime = `${String(lastHour).padStart(2, '0')}:00`;
+    const endTime = lastHour === 24 ? '23:59' : `${String(lastHour).padStart(2, '0')}:00`;
 
     const totalHours = selectedSlots.length;
     const totalPrice = totalHours * court.price_per_hour;
@@ -215,11 +215,12 @@ export default function CourtBooking({ court }: CourtBookingProps) {
             const sorted = [...selectedSlots].sort();
             const last = sorted[sorted.length - 1];
             const endH = parseInt(last.split(':')[0]) + 1;
+            const finalEndTime = endH === 24 ? '23:59' : `${String(endH).padStart(2, '0')}:00`;
             setData((prev) => ({
                 ...prev,
                 booking_date: format(selectedDate, 'yyyy-MM-dd'),
                 start_time: sorted[0],
-                end_time: `${String(endH).padStart(2, '0')}:00`,
+                end_time: finalEndTime,
             }));
         } else {
             setData((prev) => ({
@@ -254,8 +255,8 @@ export default function CourtBooking({ court }: CourtBookingProps) {
         setSelectedSlots([]); // reset selection on date change
     }, [fetchAvailability]);
 
-    // Generate time slots 06:00 – 21:00
-    const timeSlots = Array.from({ length: 16 }, (_, i) => {
+    // Generate time slots 06:00 – 23:00
+    const timeSlots = Array.from({ length: 18 }, (_, i) => {
         const hour = 6 + i;
         return `${String(hour).padStart(2, '0')}:00`;
     });
@@ -477,11 +478,19 @@ export default function CourtBooking({ court }: CourtBookingProps) {
                                                     {timeSlots.map((time) => {
                                                         const isBooked = bookedSlots.includes(time);
                                                         const isSelected = selectedSlots.includes(time);
+                                                        
+                                                        const isToday = isSameDay(selectedDate, new Date());
+                                                        const slotHour = parseInt(time.split(':')[0]);
+                                                        const currentHour = new Date().getHours();
+                                                        const isPast = isToday && slotHour <= currentHour;
+                                                        
+                                                        const state = (isBooked || isPast) ? 'booked' : isSelected ? 'selected' : 'available';
+
                                                         return (
                                                             <TimeSlotBtn
                                                                 key={time}
                                                                 time={time}
-                                                                state={isBooked ? 'booked' : isSelected ? 'selected' : 'available'}
+                                                                state={state}
                                                                 onSelect={() => toggleSlot(time)}
                                                             />
                                                         );

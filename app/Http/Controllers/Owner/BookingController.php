@@ -31,6 +31,8 @@ class BookingController extends Controller
                 'bookings.start_time',
                 'bookings.end_time',
                 'bookings.total_price',
+                'bookings.admin_fee',
+                'bookings.owner_revenue',
                 'bookings.status',
                 'bookings.payment_proof',
                 'bookings.created_at'
@@ -44,5 +46,49 @@ class BookingController extends Controller
         return Inertia::render('Owner/Bookings/Index', [
             'bookings' => $bookings,
         ]);
+    }
+
+    /**
+     * Approve booking - set status to confirmed
+     */
+    public function approve($id)
+    {
+        $booking = DB::table('bookings')->where('id', $id)->first();
+        if (!$booking) {
+            abort(404);
+        }
+
+        // Verify ownership
+        $court = DB::table('courts')->where('id', $booking->court_id)->first();
+        $venue = DB::table('venues')->where('id', $court->venue_id)->first();
+        if ($venue->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        DB::table('bookings')->where('id', $id)->update(['status' => 'confirmed']);
+
+        return back()->with('success', "Pesanan telah dikonfirmasi.");
+    }
+
+    /**
+     * Reject booking - set status to cancelled
+     */
+    public function reject($id)
+    {
+        $booking = DB::table('bookings')->where('id', $id)->first();
+        if (!$booking) {
+            abort(404);
+        }
+
+        // Verify ownership
+        $court = DB::table('courts')->where('id', $booking->court_id)->first();
+        $venue = DB::table('venues')->where('id', $court->venue_id)->first();
+        if ($venue->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        DB::table('bookings')->where('id', $id)->update(['status' => 'cancelled']);
+
+        return back()->with('success', "Pesanan telah ditolak.");
     }
 }
