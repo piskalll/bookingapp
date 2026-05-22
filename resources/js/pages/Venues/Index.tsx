@@ -17,11 +17,22 @@ interface Venue {
     name: string;
     address: string;
     image: string | null;
+    min_price: number;
     courts: Court[];
 }
 
+interface PaginatedVenues {
+    data: Venue[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    next_page_url: string | null;
+    prev_page_url: string | null;
+}
+
 interface Props {
-    venues: Venue[];
+    venues: PaginatedVenues | Venue[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -90,9 +101,9 @@ function SkeletonCard() {
 /* ------------------------------------------------------------------ */
 function VenueCard({ venue, index }: { venue: Venue; index: number }) {
     const fade = useFadeIn(index * 80);
-    const minPrice = venue.courts.length > 0
+    const minPrice = venue.min_price ?? (venue.courts.length > 0
         ? Math.min(...venue.courts.map((c) => c.price_per_hour))
-        : 0;
+        : 0);
     const courtTypes = [...new Set(venue.courts.map((c) => c.type))];
     const primaryType = courtTypes[0] || 'Olahraga';
 
@@ -194,6 +205,10 @@ export default function VenuesIndex({ venues }: Props) {
     const [activeFilter, setActiveFilter] = useState('Semua');
     const [isLoading, setIsLoading] = useState(true);
 
+    // Normalize: venues can be a Laravel paginator object or a plain array
+    const venueList: Venue[] = Array.isArray(venues) ? venues : (venues as any).data ?? [];
+    const pagination = !Array.isArray(venues) ? venues as any : null;
+
     // Simulate initial load skeleton
     useEffect(() => {
         const timer = setTimeout(() => setIsLoading(false), 600);
@@ -203,15 +218,15 @@ export default function VenuesIndex({ venues }: Props) {
     // Derive unique court types for filter pills
     const allTypes = useMemo(() => {
         const types = new Set<string>();
-        venues.forEach((v) => v.courts.forEach((c) => types.add(c.type)));
+        venueList.forEach((v) => v.courts.forEach((c) => types.add(c.type)));
         return Array.from(types).sort();
-    }, [venues]);
+    }, [venueList]);
 
     const filterOptions = ['Semua', ...allTypes];
 
     // Filter venues
     const filteredVenues = useMemo(() => {
-        return venues.filter((venue) => {
+        return venueList.filter((venue) => {
             const matchesSearch =
                 searchQuery === '' ||
                 venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -223,7 +238,7 @@ export default function VenuesIndex({ venues }: Props) {
 
             return matchesSearch && matchesType;
         });
-    }, [venues, searchQuery, activeFilter]);
+    }, [venueList, searchQuery, activeFilter]);
 
     const headerFade = useFadeIn();
 
@@ -348,6 +363,45 @@ export default function VenuesIndex({ venues }: Props) {
                             >
                                 Tampilkan Semua
                             </button>
+                        </div>
+                    )}
+
+                    {/* Pagination Controls */}
+                    {pagination && pagination.last_page > 1 && (
+                        <div className="mt-12 flex items-center justify-center gap-2">
+                            {pagination.prev_page_url && (
+                                <Link
+                                    href={pagination.prev_page_url}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-300 hover:text-emerald-600"
+                                >
+                                    ← Sebelumnya
+                                </Link>
+                            )}
+
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: pagination.last_page }, (_, i) => i + 1).map((page) => (
+                                    <Link
+                                        key={page}
+                                        href={`/venues?page=${page}`}
+                                        className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold transition-all ${
+                                            page === pagination.current_page
+                                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25'
+                                                : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-600'
+                                        }`}
+                                    >
+                                        {page}
+                                    </Link>
+                                ))}
+                            </div>
+
+                            {pagination.next_page_url && (
+                                <Link
+                                    href={pagination.next_page_url}
+                                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-300 hover:text-emerald-600"
+                                >
+                                    Selanjutnya →
+                                </Link>
+                            )}
                         </div>
                     )}
                 </div>

@@ -12,6 +12,8 @@ import {
     Menu,
     ChevronDown,
     Briefcase,
+    CreditCard,
+    ScanLine,
 } from 'lucide-react';
 
 interface OwnerLayoutProps {
@@ -26,10 +28,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { label: 'Dashboard', href: '/owner/dashboard', icon: LayoutDashboard },
-    { label: 'Kelola Tempat', href: '/owner/venues', icon: Briefcase },
-    { label: 'Kelola Lapangan', href: '/owner/courts', icon: Trophy },
-    { label: 'Kelola Pesanan', href: '/owner/bookings', icon: CalendarCheck },
+    { label: 'Dashboard',          href: '/owner/dashboard',          icon: LayoutDashboard },
+    { label: 'Kelola Tempat',      href: '/owner/venues',             icon: Briefcase       },
+    { label: 'Kelola Lapangan',    href: '/owner/courts',             icon: Trophy          },
+    { label: 'Kelola Pesanan',     href: '/owner/bookings',           icon: CalendarCheck   },
+    { label: 'Verifikasi Pesanan', href: '/owner/bookings/verify',    icon: ScanLine        },
+    { label: 'Langganan',          href: '/owner/subscription',       icon: CreditCard      },
 ];
 
 export default function OwnerLayout({ children }: OwnerLayoutProps) {
@@ -51,8 +55,12 @@ export default function OwnerLayout({ children }: OwnerLayoutProps) {
             return !v;
         });
     };
-
-    const isActive = (href: string) => currentUrl.startsWith(href);
+    const isActive = (href: string) => {
+        if (href === '/owner/bookings' && currentUrl.startsWith('/owner/bookings/verify')) {
+            return false;
+        }
+        return currentUrl.startsWith(href);
+    };
 
     const handleLogout = () => router.post('/logout');
 

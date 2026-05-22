@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Booking;
 use App\Models\Court;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
+use Midtrans\Config as MidtransConfig;
+use Midtrans\Snap;
 
 class BookingController extends Controller
 {
@@ -18,6 +20,7 @@ class BookingController extends Controller
     {
         $bookings = Booking::with('user', 'court.venue')
             ->where('user_id', auth()->id())
+            ->latest()
             ->get();
 
         return Inertia::render('Bookings/Index', [
@@ -36,17 +39,17 @@ class BookingController extends Controller
     }
 
     /**
-     * Store a newly created booking.
-     * 
+     * Store a newly created booking dan generate Midtrans Snap Token.
+     *
      * Logika validasi: Cegah double booking dengan mengecek overlapping time slots.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'court_id' => 'required|exists:courts,id',
+            'court_id'     => 'required|exists:courts,id',
             'booking_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
+            'start_time'   => 'required|date_format:H:i',
+            'end_time'     => 'required|date_format:H:i|after:start_time',
         ]);
 
         $lockKey = 'booking_court_' . $validated['court_id'] . '_' . $validated['booking_date'] . '_' . $validated['start_time'];
@@ -56,13 +59,13 @@ class BookingController extends Controller
 
         if ($lock->get()) {
             try {
-                // --- PINDAHKAN PENGECEKAN DOUBLE BOOKING KE SINI ---
+                // --- Cek Double Booking ---
                 $existingBooking = Booking::where('court_id', $validated['court_id'])
                     ->where('booking_date', $validated['booking_date'])
                     ->where('status', '!=', 'cancelled')
                     ->where(function ($query) use ($validated) {
                         $query->whereRaw('start_time < ?', [$validated['end_time']])
-                            ->whereRaw('end_time > ?', [$validated['start_time']]);
+                              ->whereRaw('end_time > ?', [$validated['start_time']]);
                     })
                     ->first();
 
@@ -73,14 +76,13 @@ class BookingController extends Controller
                 }
 
                 // Hitung harga total
-                $court = Court::with('venue.owner')->find($validated['court_id']);
+                $court     = Court::with('venue.owner')->find($validated['court_id']);
                 $startTime = strtotime($validated['start_time']);
-                $endTime = strtotime($validated['end_time']);
-                $hours = ceil(($endTime - $startTime) / 3600);
+                $endTime   = strtotime($validated['end_time']);
+                $hours     = ceil(($endTime - $startTime) / 3600);
                 $totalPrice = $court->price_per_hour * $hours;
 
                 // ── Logika Komisi ──
-                // Ambil commission_rate dari owner pemilik venue lapangan ini (default 5%)
                 $commissionRate = $court->venue?->owner?->commission_rate ?? 5.00;
                 $adminFee       = (int) round(($totalPrice * $commissionRate) / 100);
                 $ownerRevenue   = $totalPrice - $adminFee;
@@ -98,17 +100,73 @@ class BookingController extends Controller
                     'status'        => 'pending',
                 ]);
 
-                return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat!');
-                
+                // ── Generate Midtrans Snap Token ──
+                $snapToken = $this->generateSnapToken($booking, $court);
+                if ($snapToken) {
+                    $booking->update(['snap_token' => $snapToken]);
+                }
+
+                return redirect()->route('bookings.index')->with('success', 'Booking berhasil dibuat! Silakan lanjutkan pembayaran.');
+
             } finally {
-                // Pastikan gembok dilepas setelah proses selesai (baik berhasil maupun gagal/error)
                 $lock->release();
             }
         } else {
-            // Jika request gagal mendapatkan gembok (artinya ada orang lain yang sedang memproses di milidetik yang sama)
             return back()->withErrors([
                 'booking_date' => 'Sistem sedang memproses pesanan lain untuk jadwal ini. Silakan coba lagi dalam beberapa detik.',
             ]);
+        }
+    }
+
+    /**
+     * Generate Midtrans Snap Token untuk booking.
+     */
+    private function generateSnapToken(Booking $booking, Court $court): ?string
+    {
+        try {
+            MidtransConfig::$serverKey    = config('midtrans.server_key');
+            MidtransConfig::$isProduction = config('midtrans.is_production');
+            MidtransConfig::$isSanitized  = config('midtrans.is_sanitized');
+            MidtransConfig::$is3ds        = config('midtrans.is_3ds');
+
+            $user = auth()->user();
+
+            // Pisah nama depan dan belakang (untuk parameter Midtrans)
+            $nameParts = explode(' ', $user->name, 2);
+            $firstName = $nameParts[0];
+            $lastName  = $nameParts[1] ?? '';
+
+            $params = [
+                'transaction_details' => [
+                    'order_id'     => 'BOOK-' . $booking->id . '-' . time(),
+                    'gross_amount' => (int) $booking->total_price,
+                ],
+                'customer_details' => [
+                    'first_name' => $firstName,
+                    'last_name'  => $lastName,
+                    'email'      => $user->email,
+                ],
+                'item_details' => [
+                    [
+                        'id'       => 'COURT-' . $court->id,
+                        'price'    => (int) $booking->total_price,
+                        'quantity' => 1,
+                        'name'     => substr($court->name . ' - ' . $booking->booking_date, 0, 50),
+                    ],
+                ],
+                'callbacks' => [
+                    'finish' => route('bookings.index'),
+                ],
+            ];
+
+            return Snap::getSnapToken($params);
+
+        } catch (\Exception $e) {
+            Log::error('Midtrans Snap Token Error: ' . $e->getMessage(), [
+                'booking_id' => $booking->id,
+            ]);
+
+            return null;
         }
     }
 
@@ -132,86 +190,40 @@ class BookingController extends Controller
     /**
      * Check availability untuk court pada tanggal tertentu.
      * Return array dari booked hours.
-     * 
-     * Query params:
-     * - court_id: ID dari court
-     * - booking_date: Tanggal (YYYY-MM-DD)
      */
     public function checkAvailability(Request $request)
     {
         $validated = $request->validate([
-            'court_id' => 'required|exists:courts,id',
+            'court_id'     => 'required|exists:courts,id',
             'booking_date' => 'required|date_format:Y-m-d',
         ]);
 
-        // Ambil semua booking untuk court & date tersebut yang tidak cancelled
         $bookings = Booking::where('court_id', $validated['court_id'])
             ->where('booking_date', $validated['booking_date'])
             ->where('status', '!=', 'cancelled')
             ->get(['start_time', 'end_time']);
 
-        // Generate array dari booked hours
         $bookedSlots = [];
 
         foreach ($bookings as $booking) {
-            // Parse start_time dan end_time
-            $startHour = (int) explode(':', $booking->start_time)[0];
-            $startMinute = (int) explode(':', $booking->start_time)[1];
-            
-            $endHour = (int) explode(':', $booking->end_time)[0];
-            $endMinute = (int) explode(':', $booking->end_time)[1];
-
-            // Generate semua jam yang booked (dari start_hour hingga end_hour)
+            $startHour   = (int) explode(':', $booking->start_time)[0];
+            $endHour     = (int) explode(':', $booking->end_time)[0];
             $currentHour = $startHour;
+
             while ($currentHour < $endHour) {
                 $bookedSlots[] = [
-                    'hour' => $currentHour,
+                    'hour'      => $currentHour,
                     'startTime' => sprintf('%02d:00', $currentHour),
-                    'endTime' => sprintf('%02d:00', $currentHour + 1),
+                    'endTime'   => sprintf('%02d:00', $currentHour + 1),
                 ];
                 $currentHour++;
             }
         }
 
         return response()->json([
-            'court_id' => $validated['court_id'],
+            'court_id'     => $validated['court_id'],
             'booking_date' => $validated['booking_date'],
             'booked_slots' => $bookedSlots,
         ]);
-    }
-
-    /**
-     * Store payment proof untuk booking.
-     * 
-     * POST /bookings/{booking}/payment
-     */
-    public function storePayment(Request $request, Booking $booking)
-    {
-        // Validasi: hanya owner dari booking bisa upload bukti pembayaran
-        if ($booking->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized');
-        }
-
-        // Validasi file
-        $validated = $request->validate([
-            'payment_proof' => 'required|image|mimes:jpeg,png|max:2048',
-        ]);
-
-        // Hapus file lama jika ada
-        if ($booking->payment_proof && Storage::disk('public')->exists($booking->payment_proof)) {
-            Storage::disk('public')->delete($booking->payment_proof);
-        }
-
-        // Simpan file baru ke folder 'payments' dengan nama unik (tanggal + booking id + random)
-        $filename = 'payments/' . date('Ymd') . '_booking_' . $booking->id . '_' . uniqid() . '.jpg';
-        Storage::disk('public')->put($filename, file_get_contents($validated['payment_proof']));
-
-        // Update booking dengan path file payment_proof dan ubah status
-        $booking->update([
-            'payment_proof' => $filename,
-            'status' => 'waiting_confirmation',
-        ]);
-
-        return back()->with('success', 'Bukti pembayaran berhasil diunggah. Admin akan segera memverifikasi.');
     }
 }

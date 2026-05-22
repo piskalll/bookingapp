@@ -6,7 +6,26 @@ import {
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
-/*  Fade-in on scroll hook                                            */
+/*  Types                                                               */
+/* ------------------------------------------------------------------ */
+interface Court {
+    id: number;
+    name: string;
+    type: string;
+    price_per_hour: number;
+}
+
+interface FeaturedVenue {
+    id: number;
+    name: string;
+    address: string;
+    image: string | null;
+    min_price: number;
+    courts: Court[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  Fade-in on scroll hook                                             */
 /* ------------------------------------------------------------------ */
 function useFadeIn() {
     const ref = useRef<HTMLDivElement>(null);
@@ -27,15 +46,29 @@ function useFadeIn() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Data                                                              */
+/*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
-const venues = [
-    { id: 1, name: 'Lapangan Futsal Premier', location: 'Jakarta Pusat', sport: 'Futsal', price: 'Rp 150.000', rating: 4.8, image: '/images/landing/venue-futsal.png', reviews: 128 },
-    { id: 2, name: 'Badminton Court Elite', location: 'Bandung', sport: 'Badminton', price: 'Rp 100.000', rating: 4.7, image: '/images/landing/venue-badminton.png', reviews: 95 },
-    { id: 3, name: 'Tennis & Squash Pro', location: 'Surabaya', sport: 'Tennis', price: 'Rp 200.000', rating: 4.9, image: '/images/landing/venue-tennis.png', reviews: 156 },
-    { id: 4, name: 'Basket Court Central', location: 'Medan', sport: 'Basketball', price: 'Rp 120.000', rating: 4.6, image: '/images/landing/venue-basketball.png', reviews: 102 },
-];
+const sportIcons: Record<string, string> = {
+    futsal: '⚽',
+    badminton: '🏸',
+    basket: '🏀',
+    basketball: '🏀',
+    tennis: '🎾',
+    voli: '🏐',
+    volleyball: '🏐',
+};
 
+function getSportIcon(type: string) {
+    return sportIcons[type?.toLowerCase()] ?? '🏟️';
+}
+
+function formatPrice(price: number) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(price);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Static data                                                        */
+/* ------------------------------------------------------------------ */
 const steps = [
     { title: 'Cari Lapangan', desc: 'Temukan lapangan olahraga pilihan Anda dengan mudah menggunakan fitur pencarian lokasi.', icon: Search, num: '01' },
     { title: 'Pilih Jadwal', desc: 'Pilih tanggal dan jam yang tersedia sesuai dengan kebutuhan Anda.', icon: Calendar, num: '02' },
@@ -43,9 +76,9 @@ const steps = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                         */
+/*  Component                                                          */
 /* ------------------------------------------------------------------ */
-export default function Welcome() {
+export default function Welcome({ featuredVenues = [] }: { featuredVenues?: FeaturedVenue[] }) {
     const { auth } = usePage().props as any;
     const user = auth?.user;
 
@@ -217,9 +250,19 @@ export default function Welcome() {
                             <p className="mx-auto max-w-2xl text-lg text-gray-500">Pilihan lapangan terbaik dan paling banyak dipesan oleh pengguna kami.</p>
                         </div>
 
-                        <div className="mb-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                            {venues.map((v, i) => <VenueCard key={v.id} venue={v} delay={i * 100} />)}
-                        </div>
+                        {featuredVenues.length > 0 ? (
+                            <div className="mb-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                                {featuredVenues.map((venue, i) => (
+                                    <FeaturedVenueCard key={venue.id} venue={venue} delay={i * 100} />
+                                ))}
+                            </div>
+                        ) : (
+                            /* Fallback jika belum ada venue di database */
+                            <div className="mb-12 py-16 text-center">
+                                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 text-4xl">🏟️</div>
+                                <p className="text-lg text-gray-400">Belum ada lapangan yang tersedia. Pantau terus!</p>
+                            </div>
+                        )}
 
                         <div className="text-center">
                             <Link href="/venues" className="group inline-flex items-center gap-2 rounded-xl border-2 border-emerald-600 px-8 py-4 font-bold text-emerald-600 transition-all duration-300 hover:bg-emerald-600 hover:text-white hover:shadow-lg hover:shadow-emerald-600/20">
@@ -329,36 +372,50 @@ function StepCard({ num, title, desc, icon, delay }: { num: string; title: strin
 }
 
 /* ------------------------------------------------------------------ */
-/*  Venue Card                                                         */
+/*  Featured Venue Card (uses real DB data)                            */
 /* ------------------------------------------------------------------ */
-function VenueCard({ venue, delay }: { venue: typeof venues[0]; delay: number }) {
+function FeaturedVenueCard({ venue, delay }: { venue: FeaturedVenue; delay: number }) {
     const fade = useFadeIn();
+    const primaryType = venue.courts[0]?.type ?? 'Olahraga';
+
     return (
         <div ref={fade.ref} className={fade.className} style={{ transitionDelay: `${delay}ms` }}>
-            <Link href="/venues" className="group block h-full overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl">
+            <Link href={`/venues/${venue.id}`} className="group block h-full overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-emerald-200 border border-transparent">
                 {/* Image */}
                 <div className="relative aspect-[4/3] overflow-hidden">
-                    <img src={venue.image} alt={venue.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <span className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">{venue.sport}</span>
+                    {venue.image ? (
+                        <>
+                            <img
+                                src={`/uploads/venues/${venue.image}`}
+                                alt={venue.name}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                        </>
+                    ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-600">
+                            <span className="text-6xl opacity-40">{getSportIcon(primaryType)}</span>
+                        </div>
+                    )}
+                    <span className="absolute left-3 top-3 rounded-full bg-emerald-500/90 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
+                        {getSportIcon(primaryType)} {primaryType}
+                    </span>
                 </div>
 
                 {/* Content */}
                 <div className="p-5">
-                    <h3 className="mb-1.5 text-base font-bold text-gray-900 line-clamp-1">{venue.name}</h3>
-                    <div className="mb-2.5 flex items-center gap-1">
-                        <Star size={14} className="fill-amber-400 text-amber-400" />
-                        <span className="text-sm font-semibold text-gray-900">{venue.rating}</span>
-                        <span className="text-xs text-gray-400">({venue.reviews})</span>
-                    </div>
+                    <h3 className="mb-1.5 text-base font-bold text-gray-900 line-clamp-1 group-hover:text-emerald-600 transition-colors">{venue.name}</h3>
                     <div className="mb-4 flex items-center gap-1 text-sm text-gray-500">
-                        <MapPin size={14} className="shrink-0" />
-                        <span>{venue.location}</span>
+                        <MapPin size={14} className="shrink-0 text-emerald-500" />
+                        <span className="line-clamp-1">{venue.address}</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-gray-100 pt-3">
                         <div>
                             <span className="text-xs text-gray-400">Mulai dari</span>
-                            <div className="font-bold text-emerald-600">{venue.price}</div>
+                            <div className="font-bold text-emerald-600">
+                                {venue.min_price > 0 ? formatPrice(venue.min_price) : 'Hubungi Kami'}
+                            </div>
                         </div>
                         <ArrowRight size={16} className="text-gray-300 transition-colors group-hover:text-emerald-600" />
                     </div>

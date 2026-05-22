@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\PartnerController;
 use App\Http\Controllers\Admin\CourtController as AdminCourtController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\VenueController as AdminVenueController;
@@ -10,19 +11,17 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\Owner\BookingController as OwnerBookingController;
 use App\Http\Controllers\Owner\CourtController as OwnerCourtController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\SubscriptionController as OwnerSubscriptionController;
 use App\Http\Controllers\Owner\VenueController as OwnerVenueController;
 use App\Http\Controllers\VenueController;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 
 /*
 |--------------------------------------------------------------------------
 | Public Routes
 |--------------------------------------------------------------------------
 */
-Route::inertia('/', 'Welcome', [
-    'canRegister' => Features::enabled(Features::registration()),
-])->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 Route::get('/venues', [VenueController::class, 'index'])->name('venues.index');
 Route::get('/venues/{venue}', [VenueController::class, 'show'])->name('venues.show');
@@ -44,7 +43,6 @@ Route::middleware(['auth', 'verified', 'role:customer'])->group(function () {
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create/{court}', [BookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
-    Route::post('/bookings/{booking}/payment', [BookingController::class, 'storePayment'])->name('bookings.storePayment');
 });
 
 /*
@@ -94,11 +92,19 @@ Route::middleware(['auth', 'verified', 'role:owner'])->prefix('owner')->name('ow
     Route::put('/bookings/{booking}/approve', [OwnerBookingController::class, 'approve'])->name('bookings.approve');
     Route::put('/bookings/{booking}/reject', [OwnerBookingController::class, 'reject'])->name('bookings.reject');
 
+    // Verifikasi kode booking
+    Route::get('/bookings/verify', [OwnerBookingController::class, 'verificationPage'])->name('bookings.verify');
+    Route::post('/bookings/verify-code', [OwnerBookingController::class, 'verifyCode'])->name('bookings.verifyCode');
+
     // Venues — read-only (venue dibuat oleh admin dan di-assign ke owner)
     Route::resource('venues', OwnerVenueController::class)->only(['index', 'edit', 'update']);
 
     // Courts — CRUD hanya dalam venue yang di-assign ke owner ini
     Route::resource('courts', OwnerCourtController::class)->except(['show']);
+
+    // Subscription — perpanjangan masa aktif
+    Route::get('/subscription', [OwnerSubscriptionController::class, 'index'])->name('subscription.index');
+    Route::post('/subscription/pay', [OwnerSubscriptionController::class, 'pay'])->name('subscription.pay');
 });
 
 require __DIR__.'/settings.php';

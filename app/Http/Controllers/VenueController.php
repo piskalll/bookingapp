@@ -28,9 +28,26 @@ class VenueController extends Controller
      * Display a listing of venues (Customer-facing).
      * Hanya tampilkan venue dari owner yang langganannya aktif.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $venues = $this->activeVenueQuery()->get();
+        $venues = $this->activeVenueQuery()
+            ->latest()
+            ->paginate(9)
+            ->through(function ($venue) {
+                return [
+                    'id'        => $venue->id,
+                    'name'      => $venue->name,
+                    'address'   => $venue->address,
+                    'image'     => $venue->image,
+                    'min_price' => $venue->courts->min('price_per_hour') ?? 0,
+                    'courts'    => $venue->courts->map(fn($c) => [
+                        'id'             => $c->id,
+                        'name'           => $c->name,
+                        'type'           => $c->type,
+                        'price_per_hour' => $c->price_per_hour,
+                    ]),
+                ];
+            });
 
         return Inertia::render('Venues/Index', [
             'venues' => $venues,

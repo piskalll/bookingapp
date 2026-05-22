@@ -1,69 +1,85 @@
-// Components
-import { Form, Head } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import { Mail, Send, CheckCircle } from 'lucide-react';
 import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
     return (
         <>
-            <Head title="Forgot password" />
+            <Head title="Lupa Password" />
 
             {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
+                <div className="mb-5 flex items-start gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3.5">
+                    <CheckCircle size={18} className="shrink-0 text-emerald-600 mt-0.5" />
+                    <p className="text-sm font-medium text-emerald-700">{status}</p>
                 </div>
             )}
 
-            <div className="space-y-6">
+            <div className="space-y-5">
                 <Form {...email.form()}>
                     {({ processing, errors }) => (
                         <>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    autoComplete="off"
-                                    autoFocus
-                                    placeholder="email@example.com"
-                                />
-
+                            <div className="space-y-1.5">
+                                <label htmlFor="email" className="block text-sm font-semibold text-slate-700">
+                                    Alamat Email Terdaftar
+                                </label>
+                                <div className="relative">
+                                    <Mail
+                                        size={16}
+                                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                                    />
+                                    <input
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        autoComplete="off"
+                                        autoFocus
+                                        placeholder="nama@email.com"
+                                        className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all duration-200 hover:border-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                                    />
+                                </div>
                                 <InputError message={errors.email} />
                             </div>
 
-                            <div className="my-6 flex items-center justify-start">
-                                <Button
-                                    className="w-full"
-                                    disabled={processing}
-                                    data-test="email-password-reset-link-button"
-                                >
-                                    {processing && (
-                                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    )}
-                                    Email password reset link
-                                </Button>
-                            </div>
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                data-test="email-password-reset-link-button"
+                                className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 hover:from-emerald-600 hover:to-teal-600 hover:shadow-lg hover:shadow-emerald-500/30 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {processing ? (
+                                    <>
+                                        <Spinner />
+                                        Mengirim...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Send size={16} />
+                                        Kirim Link Reset Password
+                                    </>
+                                )}
+                            </button>
                         </>
                     )}
                 </Form>
 
-                <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>Or, return to</span>
-                    <TextLink href={login()}>log in</TextLink>
-                </div>
+                <p className="text-center text-sm text-slate-500">
+                    Ingat password Anda?{' '}
+                    <Link
+                        href={login()}
+                        className="font-semibold text-emerald-600 hover:text-emerald-700 hover:underline transition"
+                    >
+                        Kembali masuk
+                    </Link>
+                </p>
             </div>
         </>
     );
 }
 
 ForgotPassword.layout = {
-    title: 'Forgot password',
-    description: 'Enter your email to receive a password reset link',
+    title: 'Lupa Password?',
+    description: 'Masukkan email Anda dan kami akan mengirimkan link untuk mereset password.',
 };

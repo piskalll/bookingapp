@@ -104,11 +104,10 @@ function ConfirmDialog({
                         </button>
                         <button
                             onClick={onConfirm}
-                            className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all ${
-                                isDangerous
-                                    ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
-                                    : 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
-                            }`}
+                            className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold shadow-lg transition-all ${isDangerous
+                                ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                                : 'bg-green-600 hover:bg-green-700 shadow-green-600/20'
+                                }`}
                         >
                             {confirmText}
                         </button>
@@ -349,7 +348,7 @@ export default function BookingManager({ bookings }: Props) {
                                         <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jadwal</th>
                                         <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                                         <th className="px-5 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                        <th className="px-5 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aksi</th>
+                                        <th className="px-5 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">-</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -375,7 +374,7 @@ export default function BookingManager({ bookings }: Props) {
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                     <Clock size={12} />
-                                                    {booking.start_time.slice(0,5)} - {booking.end_time.slice(0,5)}
+                                                    {booking.start_time.slice(0, 5)} - {booking.end_time.slice(0, 5)}
                                                 </div>
                                             </td>
 
