@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('venues', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('owner_id')->constrained('users')->cascadeOnDelete();
             $table->string('name');
             $table->string('address');
             $table->string('image')->nullable();

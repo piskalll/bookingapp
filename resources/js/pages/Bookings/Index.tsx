@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     CheckCircle, Clock, XCircle, MapPin, Calendar,
@@ -104,46 +104,189 @@ function StatusBadge({ status }: { status: string }) {
 /* Receipt Modal (Struk Digital)                                         */
 /* ------------------------------------------------------------------ */
 function ReceiptModal({ booking, onClose }: { booking: Booking; onClose: () => void }) {
-    const duration  = calcDuration(booking.start_time, booking.end_time);
+    const duration     = calcDuration(booking.start_time, booking.end_time);
     const pricePerHour = duration > 0 ? Math.round(booking.total_price / duration) : booking.total_price;
-    const adminFee  = booking.admin_fee ?? 0;
-    const subTotal  = booking.total_price;
-    const now       = new Date();
+    const adminFee     = booking.admin_fee ?? 0;
+    const subTotal     = booking.total_price;
+    const now          = new Date();
 
-    const handlePrint = () => window.print();
+    /* ── Print: buka jendela baru agar tidak blank ── */
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank', 'width=600,height=800');
+        if (!printWindow) {
+            alert('❌ Popup diblokir browser.\nIzinkan popup untuk situs ini agar bisa mencetak struk.');
+            return;
+        }
+
+        const sportIcon     = getSportIcon(booking.court.type);
+        const adminRow      = adminFee > 0
+            ? `<tr><td class="lbl">Biaya Layanan Platform</td><td class="val muted">${formatRp(adminFee)}</td></tr>`
+            : '';
+        const customerRows  = booking.user
+            ? `<tr><td class="lbl">Nama</td><td class="val">${booking.user.name}</td></tr>
+               <tr><td class="lbl">Email</td><td class="val">${booking.user.email}</td></tr>`
+            : '';
+        const customerSection = booking.user
+            ? `<div class="section-title">Detail Pemesan</div>
+               <table class="rows">${customerRows}</table>
+               <hr class="dash">`
+            : '';
+        const zigzag = Array.from({length: 18}).map((_,i) =>
+            `<div class="zz ${i%2===0?'zz-w':'zz-g'}"></div>`
+        ).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Struk – ${booking.booking_code ?? booking.id}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:'Segoe UI',Arial,sans-serif;
+      background:#f1f5f9;
+      display:flex;
+      justify-content:center;
+      padding:24px;
+      min-height:100vh;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    .card{
+      background:#fff;
+      width:100%;
+      max-width:420px;
+      border-radius:20px;
+      box-shadow:0 8px 32px rgba(0,0,0,.15);
+      overflow:hidden;
+      height:fit-content;
+    }
+    .header{
+      background:linear-gradient(135deg,#10b981 0%,#0d9488 50%,#0891b2 100%) !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      color:#fff;
+      padding:28px 24px 36px;
+      text-align:center;
+    }
+    .brand{font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#a7f3d0;margin-bottom:2px}
+    .subtitle{font-size:11px;color:#6ee7b7;margin-bottom:12px}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      background:rgba(255,255,255,.25) !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      border:1px solid rgba(255,255,255,.4);
+      border-radius:99px;padding:6px 20px;
+      margin:4px 0 12px;font-size:16px;font-weight:900;letter-spacing:.15em;
+    }
+    .code-label{font-size:11px;color:#6ee7b7;font-weight:600;margin-bottom:4px}
+    .code{font-family:'Courier New',monospace;font-size:22px;font-weight:900;letter-spacing:.15em}
+    .zigzag{display:flex;height:14px;overflow:hidden}
+    .zz{flex:1;height:14px}
+    .zz-w{
+      background:#fff !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      clip-path:polygon(0 0,100% 0,50% 100%)
+    }
+    .zz-g{
+      background:#10b981 !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      clip-path:polygon(0 0,100% 0,50% 100%)
+    }
+    .body{padding:18px 22px 22px}
+    .section-title{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#9ca3af;margin:14px 0 8px}
+    .rows{width:100%;border-collapse:collapse}
+    .rows tr td{padding:4px 0;font-size:13px;vertical-align:top}
+    .lbl{color:#6b7280;width:56%}
+    .val{color:#111827;font-weight:600;text-align:right}
+    .muted{color:#9ca3af !important;font-weight:500}
+    .total-box{
+      background:#ecfdf5 !important;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+      border:1px solid #a7f3d0;
+      border-radius:10px;
+      padding:10px 14px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-top:10px;
+    }
+    .total-lbl{font-size:13px;font-weight:700;color:#065f46}
+    .total-val{font-size:19px;font-weight:900;color:#047857}
+    .dash{border:none;border-top:1.5px dashed #e5e7eb;margin:12px 0}
+    .footer{text-align:center;margin-top:12px;font-size:11px;color:#9ca3af;line-height:1.7}
+    @media print{
+      body{background:#fff !important;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .card{box-shadow:none;border-radius:0;max-width:100%}
+      @page{size:A5 portrait;margin:.5cm}
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="brand">LapanganPro</div>
+      <div class="subtitle">Struk Pemesanan Digital</div>
+      <div class="badge">&#10003; LUNAS</div>
+      <div class="code-label">Kode Booking</div>
+      <div class="code">${booking.booking_code ?? '-'}</div>
+    </div>
+    <div class="zigzag">${zigzag}</div>
+    <div class="body">
+      <div class="section-title">Detail Jadwal</div>
+      <table class="rows">
+        <tr><td class="lbl">Tempat</td><td class="val">${booking.court.venue.name}</td></tr>
+        <tr><td class="lbl">Lapangan</td><td class="val">${sportIcon} ${booking.court.name}</td></tr>
+        <tr><td class="lbl">Tanggal</td><td class="val">${formatDateShort(booking.booking_date)}</td></tr>
+        <tr><td class="lbl">Jam</td><td class="val">${booking.start_time} &ndash; ${booking.end_time}</td></tr>
+        <tr><td class="lbl">Durasi</td><td class="val">${duration} jam</td></tr>
+      </table>
+      <hr class="dash">
+      ${customerSection}
+      <div class="section-title">Rincian Biaya</div>
+      <table class="rows">
+        <tr><td class="lbl">Harga (${duration} jam &times; ${formatRp(pricePerHour)})</td><td class="val">${formatRp(subTotal)}</td></tr>
+        ${adminRow}
+        <tr><td class="lbl">Metode Pembayaran</td><td class="val">Midtrans</td></tr>
+      </table>
+      <div class="total-box">
+        <span class="total-lbl">Total Dibayar</span>
+        <span class="total-val">${formatRp(subTotal)}</span>
+      </div>
+      <div class="footer">
+        <div>Dicetak: ${now.toLocaleString('id-ID')}</div>
+        <div>Terima kasih telah menggunakan LapanganPro!</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        /* tunggu DOM selesai dirender sebelum print dipanggil */
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.onafterprint = () => printWindow.close();
+        }, 600);
+    };
 
     return (
         <>
-            {/* ── Print-only CSS (injected via <style>) ── */}
-            <style>{`
-                @media print {
-                    body > *:not(#receipt-print-area) { display: none !important; }
-                    #receipt-print-area {
-                        display: block !important;
-                        position: fixed;
-                        inset: 0;
-                        z-index: 9999;
-                        background: white;
-                        padding: 24px;
-                    }
-                    #receipt-modal-overlay { display: none !important; }
-                    .no-print { display: none !important; }
-                    @page { margin: 0.5cm; size: A5; }
-                }
-            `}</style>
-
             {/* Overlay */}
             <div
-                id="receipt-modal-overlay"
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm no-print"
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
                 onClick={onClose}
             />
 
             {/* ── Receipt Card ── */}
-            <div
-                id="receipt-print-area"
-                className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
-            >
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
                 <div
                     className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md pointer-events-auto overflow-hidden"
                     onClick={e => e.stopPropagation()}
@@ -240,7 +383,7 @@ function ReceiptModal({ booking, onClose }: { booking: Booking; onClose: () => v
                         </div>
 
                         {/* ── Action Buttons ── */}
-                        <div className="flex gap-3 pt-2 no-print">
+                        <div className="flex gap-3 pt-2">
                             <button
                                 onClick={handlePrint}
                                 id="btn-print-receipt"
@@ -257,10 +400,10 @@ function ReceiptModal({ booking, onClose }: { booking: Booking; onClose: () => v
                         </div>
                     </div>
 
-                    {/* Close button top-right (screen only) */}
+                    {/* Close button top-right */}
                     <button
                         onClick={onClose}
-                        className="no-print absolute top-4 right-4 p-1.5 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
+                        className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 text-white hover:bg-white/30 transition-colors"
                     >
                         <X size={16} />
                     </button>

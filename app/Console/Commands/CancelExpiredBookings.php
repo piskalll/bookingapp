@@ -32,7 +32,7 @@ class CancelExpiredBookings extends Command
         // 3. Dibuat lebih dari 15 menit yang lalu
         $expiredBookings = Booking::where('status', 'pending')
             ->whereNull('payment_proof')
-            ->where('created_at', '<', now()->subMinutes(15))
+            ->where('created_at', '<', now()->subMinutes(2))
             ->get();
 
         $count = $expiredBookings->count();
@@ -45,7 +45,7 @@ class CancelExpiredBookings extends Command
         // Update status menjadi cancelled
         Booking::where('status', 'pending')
             ->whereNull('payment_proof')
-            ->where('created_at', '<', now()->subMinutes(15))
+            ->where('created_at', '<', now()->subMinutes(2))
             ->update(['status' => 'cancelled']);
 
         // Output informasi ke console
