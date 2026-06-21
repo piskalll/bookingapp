@@ -76,6 +76,8 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 
     // Reports
     Route::get('/reports/export-pdf', [ReportController::class, 'exportPdf'])->name('reports.exportPdf');
+    Route::get('/reports/subscription', [ReportController::class, 'subscriptionReport'])->name('reports.subscription');
+    Route::get('/reports/subscription-pdf', [ReportController::class, 'exportSubscriptionPdf'])->name('reports.subscriptionPdf');
 });
 
 /*

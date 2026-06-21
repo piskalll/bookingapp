@@ -21,7 +21,11 @@ class BookingController extends Controller
         $bookings = Booking::with('user', 'court.venue')
             ->where('user_id', auth()->id())
             ->latest()
-            ->get();
+            ->get()
+            ->map(fn($booking) => array_merge($booking->toArray(), [
+                'updated_at' => $booking->updated_at?->toIso8601String(),
+                'created_at' => $booking->created_at?->toIso8601String(),
+            ]));
 
         return Inertia::render('Bookings/Index', [
             'bookings' => $bookings,

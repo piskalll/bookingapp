@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     CheckCircle, Clock, XCircle, MapPin, Calendar,
     CreditCard, RefreshCw, AlertTriangle, Zap,
-    FileText, Printer, X, QrCode,
+    FileText, Printer, X, QrCode, Timer,
 } from 'lucide-react';
 
 // ── Global Snap type (already declared in app, keep in sync) ──────────────────
@@ -36,6 +36,8 @@ interface Booking {
     status: string;
     snap_token?: string | null;
     booking_code?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
     court: {
         id: number;
         name: string;
@@ -57,6 +59,54 @@ interface Props {
 }
 
 /* ------------------------------------------------------------------ */
+/* Constants                                                             */
+/* ------------------------------------------------------------------ */
+/** Harus sinkron dengan CancelExpiredBookings.php -> subMinutes(15) */
+const CANCEL_AFTER_MINUTES = 15;
+
+/* ------------------------------------------------------------------ */
+/* Countdown Hook                                                        */
+/* ------------------------------------------------------------------ */
+function useCountdown(createdAt: string | null | undefined): {
+    secondsLeft: number;
+    isExpired: boolean;
+    totalSeconds: number;
+    pct: number;       // 0–1, 1 = full time left
+    urgency: 'normal' | 'warning' | 'critical';
+} {
+    const totalSeconds = CANCEL_AFTER_MINUTES * 60;
+
+    const calc = () => {
+        if (!createdAt) return totalSeconds;
+        const deadline = new Date(createdAt).getTime() + totalSeconds * 1000;
+        return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    };
+
+    const [secondsLeft, setSecondsLeft] = useState(calc);
+    const ref = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (!createdAt) return;
+        ref.current = setInterval(() => {
+            const s = calc();
+            setSecondsLeft(s);
+            if (s <= 0) {
+                if (ref.current) clearInterval(ref.current);
+                // Auto-reload agar status terbaru dari server ditampilkan
+                setTimeout(() => router.reload({ only: ['bookings'] }), 1000);
+            }
+        }, 1000);
+        return () => { if (ref.current) clearInterval(ref.current); };
+    }, [createdAt]);
+
+    const pct = secondsLeft / totalSeconds;
+    const urgency: 'normal' | 'warning' | 'critical' =
+        secondsLeft <= 20 ? 'critical' : secondsLeft <= 45 ? 'warning' : 'normal';
+
+    return { secondsLeft, isExpired: secondsLeft <= 0, totalSeconds, pct, urgency };
+}
+
+/* ------------------------------------------------------------------ */
 /* Helpers                                                               */
 /* ------------------------------------------------------------------ */
 const sportIcons: Record<string, string> = {
@@ -70,6 +120,12 @@ const formatDate = (d: string) =>
 
 const formatDateShort = (d: string) =>
     new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+const formatDateTime = (d: string) =>
+    new Date(d).toLocaleString('id-ID', {
+        weekday: 'long', day: '2-digit', month: 'long',
+        year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
 
 const formatRp = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
@@ -413,6 +469,182 @@ function ReceiptModal({ booking, onClose }: { booking: Booking; onClose: () => v
     );
 }
 
+/* ------------------------------------------------------------------ */
+/* Countdown Timer Component                                             */
+/* ------------------------------------------------------------------ */
+function CountdownTimer({ booking }: { booking: Booking }) {
+    const { secondsLeft, isExpired, pct, urgency } = useCountdown(booking.created_at);
+
+    const mins = Math.floor(secondsLeft / 60);
+    const secs = secondsLeft % 60;
+    const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+    // Circular SVG ring
+    const radius = 26;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference * (1 - pct);
+
+    const ringColor =
+        urgency === 'critical' ? '#ef4444' :
+        urgency === 'warning'  ? '#f97316' : '#f59e0b';
+
+    const bgGradient =
+        urgency === 'critical'
+            ? 'from-red-50 to-rose-50 border-red-200'
+            : urgency === 'warning'
+            ? 'from-orange-50 to-amber-50 border-orange-200'
+            : 'from-amber-50 to-yellow-50 border-amber-200';
+
+    const textColor =
+        urgency === 'critical' ? 'text-red-700' :
+        urgency === 'warning'  ? 'text-orange-700' : 'text-amber-700';
+
+    const labelColor =
+        urgency === 'critical' ? 'text-red-400' :
+        urgency === 'warning'  ? 'text-orange-400' : 'text-amber-400';
+
+    const headerBg =
+        urgency === 'critical'
+            ? 'from-red-500 to-rose-600'
+            : urgency === 'warning'
+            ? 'from-orange-500 to-amber-500'
+            : 'from-amber-400 to-yellow-500';
+
+    if (isExpired) {
+        return (
+            <div className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-400 to-gray-500">
+                    <Timer size={14} className="text-white" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white">Waktu Habis</span>
+                </div>
+                <div className="px-4 py-3 flex items-center gap-2">
+                    <RefreshCw size={14} className="text-gray-400 animate-spin" />
+                    <p className="text-xs text-gray-500">Memperbarui status pesanan...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`w-full rounded-xl overflow-hidden border bg-gradient-to-br ${bgGradient}`}>
+            {/* Header strip */}
+            <div className={`flex items-center justify-between px-4 py-2.5 bg-gradient-to-r ${headerBg}`}>
+                <div className="flex items-center gap-2">
+                    <Timer size={14} className="text-white" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white">
+                        Batas Waktu Pembayaran
+                    </span>
+                </div>
+                {urgency === 'critical' && (
+                    <span className="text-[10px] font-bold text-white bg-white/20 rounded-full px-2 py-0.5 animate-pulse">
+                        SEGERA!
+                    </span>
+                )}
+            </div>
+
+            {/* Body */}
+            <div className="px-4 py-3 flex items-center gap-4">
+                {/* Circular ring */}
+                <div className="relative shrink-0 w-16 h-16">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                        {/* Track */}
+                        <circle
+                            cx="32" cy="32" r={radius}
+                            fill="none" stroke="#e5e7eb" strokeWidth="5"
+                        />
+                        {/* Progress arc */}
+                        <circle
+                            cx="32" cy="32" r={radius}
+                            fill="none"
+                            stroke={ringColor}
+                            strokeWidth="5"
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={dashOffset}
+                            style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.4s ease' }}
+                        />
+                    </svg>
+                    {/* Time text inside ring */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className={`font-mono font-extrabold text-sm leading-none ${textColor} ${
+                            urgency === 'critical' ? 'animate-pulse' : ''
+                        }`}>
+                            {timeStr}
+                        </span>
+                        <span className={`text-[9px] font-semibold ${labelColor} mt-0.5`}>menit</span>
+                    </div>
+                </div>
+
+                {/* Text info */}
+                <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold ${textColor} leading-snug`}>
+                        {urgency === 'critical'
+                            ? '⚡ Segera selesaikan pembayaran!'
+                            : urgency === 'warning'
+                            ? '⏳ Waktu hampir habis'
+                            : '🕐 Selesaikan sebelum waktu habis'
+                        }
+                    </p>
+                    <p className={`text-[11px] mt-1 ${labelColor} leading-snug`}>
+                        Pesanan akan otomatis dibatalkan jika pembayaran tidak
+                        selesai dalam <span className="font-bold">{CANCEL_AFTER_MINUTES} menit</span> sejak pemesanan.
+                    </p>
+                    {/* Progress bar */}
+                    <div className="mt-2 w-full h-1.5 rounded-full bg-white/60 overflow-hidden">
+                        <div
+                            className="h-full rounded-full transition-all duration-1000"
+                            style={{ width: `${Math.round(pct * 100)}%`, backgroundColor: ringColor }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* Cancellation Info Card                                                */
+/* ------------------------------------------------------------------ */
+function CancellationInfo({ booking }: { booking: Booking }) {
+    const cancelledAt = booking.updated_at ?? booking.created_at;
+    const formattedTime = cancelledAt ? formatDateTime(cancelledAt) : null;
+
+    return (
+        <div className="w-full rounded-xl overflow-hidden border border-red-200 bg-gradient-to-br from-red-50 to-rose-50">
+            {/* Header strip */}
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-rose-500">
+                <XCircle size={14} className="text-white" />
+                <span className="text-xs font-bold uppercase tracking-widest text-white">Pesanan Dibatalkan</span>
+            </div>
+            {/* Body */}
+            <div className="px-4 py-3 space-y-2">
+                {formattedTime && (
+                    <div className="flex items-start gap-2.5">
+                        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100">
+                            <Clock size={12} className="text-red-500" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-0.5">Waktu Pembatalan</p>
+                            <p className="text-xs font-semibold text-red-700 leading-snug">{formattedTime}</p>
+                        </div>
+                    </div>
+                )}
+                <div className="flex items-start gap-2.5">
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100">
+                        <AlertTriangle size={12} className="text-red-500" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-red-400 mb-0.5">Keterangan</p>
+                        <p className="text-xs text-red-600 leading-snug">
+                            Pesanan ini telah dibatalkan dan tidak dapat dikembalikan. Silakan buat pesanan baru.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
     return (
         <div className="flex justify-between items-start gap-4">
@@ -561,6 +793,10 @@ export default function BookingsIndex({ bookings }: Props) {
                                             </div>
 
                                             <div className="mt-auto space-y-3">
+                                                {/* Countdown Timer — hanya saat pending */}
+                                                {booking.status === 'pending' && (
+                                                    <CountdownTimer booking={booking} />
+                                                )}
                                                 {/* Tombol Lihat Struk — hanya saat confirmed */}
                                                 {booking.status === 'confirmed' && booking.booking_code && (
                                                     <button
@@ -595,9 +831,7 @@ export default function BookingsIndex({ bookings }: Props) {
                                                 )}
 
                                                 {booking.status === 'cancelled' && (
-                                                    <div className="w-full py-3 px-4 bg-red-50 border border-red-200 text-red-700 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm">
-                                                        <XCircle size={16} /> Pesanan Dibatalkan
-                                                    </div>
+                                                    <CancellationInfo booking={booking} />
                                                 )}
 
                                                 <Link

@@ -16,6 +16,7 @@ import {
     X,
     ChevronDown,
     ShieldCheck,
+    Banknote,
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -29,11 +30,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { label: 'Dashboard',      href: '/admin/dashboard',    icon: LayoutDashboard },
-    { label: 'Kelola Tempat',  href: '/admin/venues',       icon: Building2 },
-    { label: 'Kelola Mitra',   href: '/admin/partners',     icon: Handshake },
-    { label: 'Kelola Pengguna',href: '/admin/users',        icon: Users },
-    { label: 'Semua Pesanan',  href: '/admin/bookings',     icon: ClipboardList },
+    { label: 'Dashboard',          href: '/admin/dashboard',              icon: LayoutDashboard },
+    { label: 'Kelola Tempat',      href: '/admin/venues',                 icon: Building2 },
+    { label: 'Kelola Mitra',       href: '/admin/partners',               icon: Handshake },
+    { label: 'Kelola Pengguna',    href: '/admin/users',                  icon: Users },
+    { label: 'Semua Pesanan',      href: '/admin/bookings',               icon: ClipboardList },
+    { label: 'Laporan Langganan',  href: '/admin/reports/subscription',   icon: Banknote },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

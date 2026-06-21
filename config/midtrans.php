@@ -11,8 +11,6 @@ return [
     |
     */
 
-    'server_key'    => env('MIDTRANS_SERVER_KEY', 'Mid-server-qUOhJPSpG7SbvSJibrzKnjqi'),
-    'client_key'    => env('MIDTRANS_CLIENT_KEY', 'Mid-client-q6UIB0J4SbLxSIF1'),
     'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
 
     /*
